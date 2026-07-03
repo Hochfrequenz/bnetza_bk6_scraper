@@ -22,7 +22,7 @@ class Document(BaseModel):
     """
 
     source_url: str
-    """Absolute URL the PDF was downloaded from, e.g. ``"https://www.bundesnetzagentur.de/.../BK6-23-241_konsultationsdokument.pdf?__blob=publicationFile&v=3"``."""
+    """Absolute URL the PDF was downloaded from (may carry a ``?__blob=publicationFile&v=…`` query)."""
 
     filename: str
     """Bare filename written into the mirror, e.g. ``"BK6-23-241_konsultationsdokument.pdf"``."""
