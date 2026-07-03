@@ -5,7 +5,7 @@ from bnetza_bk6_scraper.normalize import normalize_html
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def test_normalize_keeps_content_drops_chrome():
+def test_normalize_keeps_content_drops_chrome() -> None:
     html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(
         encoding="utf-8"
     )

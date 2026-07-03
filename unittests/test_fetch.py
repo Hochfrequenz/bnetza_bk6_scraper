@@ -4,7 +4,7 @@ from bnetza_bk6_scraper.fetch import Fetcher
 
 
 @pytest.mark.asyncio
-async def test_fetch_text_returns_body():
+async def test_fetch_text_returns_body() -> None:
     url = "https://www.bundesnetzagentur.de/x.html"
     with aioresponses() as mocked:
         mocked.get(url, status=200, body="<html>ok</html>")
@@ -14,7 +14,7 @@ async def test_fetch_text_returns_body():
 
 
 @pytest.mark.asyncio
-async def test_fetch_bytes_returns_content():
+async def test_fetch_bytes_returns_content() -> None:
     url = "https://www.bundesnetzagentur.de/x.pdf"
     with aioresponses() as mocked:
         mocked.get(url, status=200, body=b"%PDF-1.7")
@@ -24,7 +24,7 @@ async def test_fetch_bytes_returns_content():
 
 
 @pytest.mark.asyncio
-async def test_fetch_retries_on_transient_error():
+async def test_fetch_retries_on_transient_error() -> None:
     url = "https://www.bundesnetzagentur.de/flaky.html"
     with aioresponses() as mocked:
         mocked.get(url, status=503)
@@ -35,7 +35,7 @@ async def test_fetch_retries_on_transient_error():
 
 
 @pytest.mark.asyncio
-async def test_fetch_retries_on_waf_block_page():
+async def test_fetch_retries_on_waf_block_page() -> None:
     url = "https://www.bundesnetzagentur.de/blocked.html"
     with aioresponses() as mocked:
         mocked.get(url, status=200, body="... The requested URL was rejected ...")
@@ -45,6 +45,6 @@ async def test_fetch_retries_on_waf_block_page():
     assert body == "real content"
 
 
-def test_browser_user_agent_configured():
+def test_browser_user_agent_configured() -> None:
     from bnetza_bk6_scraper.fetch import _HEADERS
     assert "Mozilla/5.0" in _HEADERS["User-Agent"]
