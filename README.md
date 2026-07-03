@@ -1,5 +1,13 @@
 # bnetza_bk6_scraper
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Python Versions (officially) supported](https://img.shields.io/pypi/pyversions/bnetza_bk6_scraper.svg)
+![PyPI Status Badge](https://img.shields.io/pypi/v/bnetza_bk6_scraper)
+![Unittests status badge](https://github.com/Hochfrequenz/bnetza_bk6_scraper/workflows/Unittests/badge.svg)
+![Coverage status badge](https://github.com/Hochfrequenz/bnetza_bk6_scraper/workflows/Coverage/badge.svg)
+![Linting status badge](https://github.com/Hochfrequenz/bnetza_bk6_scraper/workflows/Linting/badge.svg)
+![Formatting status badge](https://github.com/Hochfrequenz/bnetza_bk6_scraper/workflows/Formatting/badge.svg)
+
 `bnetza_bk6_scraper` mirrors the documents published by the German
 Bundesnetzagentur (BNetzA) **Beschlusskammer 6** (BK6) into a structured,
 git-diffable directory tree. BK6 regulates electricity network access and is a
