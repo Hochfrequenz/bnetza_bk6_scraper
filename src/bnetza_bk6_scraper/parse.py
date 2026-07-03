@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup, Tag
 
 from bnetza_bk6_scraper.models import Document, Proceeding
 
-_AKTENZEICHEN_RE = re.compile(r"(BK6-\d{2}-\d{2,4})")
+_AKTENZEICHEN_RE = re.compile(r"(?P<aktenzeichen>BK6-\d{2}-\d{2,4})")
 
 
 def _attr_str(tag: Tag, name: str) -> str | None:
@@ -24,7 +24,7 @@ def aktenzeichen_from_url(url: str) -> str:
     match = _AKTENZEICHEN_RE.search(url)
     if not match:
         raise ValueError(f"no Aktenzeichen found in URL: {url}")
-    return match.group(1)
+    return match.group("aktenzeichen")
 
 
 def year_from_aktenzeichen(aktenzeichen: str) -> int:
