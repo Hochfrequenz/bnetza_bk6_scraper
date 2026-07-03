@@ -5,8 +5,7 @@ from bnetza_bk6_scraper.parse import parse_proceeding_page
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BASE_URL = (
-    "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
-    "BK6-23-241/BK6-23-241_konsultation.html"
+    "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/" "BK6-23-241/BK6-23-241_konsultation.html"
 )
 
 

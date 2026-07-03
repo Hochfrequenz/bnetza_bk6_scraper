@@ -56,7 +56,7 @@ def _effective_base(soup: BeautifulSoup, page_url: str) -> str:
 def _doc_type_from_filename(filename: str, aktenzeichen: str) -> str:
     stem = filename.rsplit(".", 1)[0]
     prefix = f"{aktenzeichen}_"
-    return stem[len(prefix):] if stem.startswith(prefix) else stem
+    return stem[len(prefix) :] if stem.startswith(prefix) else stem
 
 
 def phase_from_url(page_url: str) -> str:
@@ -77,12 +77,14 @@ def _parse_documents(content: Tag, base: str, aktenzeichen: str) -> list[Documen
             continue
         href = urljoin(base, href_attr)
         filename = filename_from_pdf_url(href)
-        documents.append(Document(
-            title=anchor.get_text(strip=True) or filename,
-            doc_type=_doc_type_from_filename(filename, aktenzeichen),
-            source_url=href,
-            filename=filename,
-        ))
+        documents.append(
+            Document(
+                title=anchor.get_text(strip=True) or filename,
+                doc_type=_doc_type_from_filename(filename, aktenzeichen),
+                source_url=href,
+                filename=filename,
+            )
+        )
     return documents
 
 

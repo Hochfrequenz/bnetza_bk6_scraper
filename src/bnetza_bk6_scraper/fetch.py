@@ -29,9 +29,7 @@ class WafBlockedError(aiohttp.ClientError):
 class Fetcher:
     """Bounded-concurrency aiohttp wrapper with retry/backoff."""
 
-    def __init__(
-        self, concurrency: int = 4, max_retries: int = 3, backoff_seconds: float = 1.0
-    ) -> None:
+    def __init__(self, concurrency: int = 4, max_retries: int = 3, backoff_seconds: float = 1.0) -> None:
         self._semaphore = asyncio.Semaphore(concurrency)
         self._max_retries = max_retries
         self._backoff = backoff_seconds
@@ -55,9 +53,7 @@ class Fetcher:
                 try:
                     async with self._session.get(url) as resp:
                         if resp.status in _TRANSIENT:
-                            raise aiohttp.ClientResponseError(
-                                resp.request_info, resp.history, status=resp.status
-                            )
+                            raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
                         resp.raise_for_status()
                         if as_text:
                             text = await resp.text()

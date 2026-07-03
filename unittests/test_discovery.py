@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from aioresponses import aioresponses
 
-from bnetza_bk6_scraper.discovery import discover_proceeding_urls
 from bnetza_bk6_scraper import discovery
+from bnetza_bk6_scraper.discovery import discover_proceeding_urls
 from bnetza_bk6_scraper.fetch import Fetcher
 
 FIXTURES = Path(__file__).parent / "fixtures"

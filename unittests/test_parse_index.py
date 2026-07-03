@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from bnetza_bk6_scraper.parse import parse_index_page
 
 FIXTURES = Path(__file__).parent / "fixtures"

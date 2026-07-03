@@ -6,9 +6,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_normalize_keeps_content_drops_chrome() -> None:
-    html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(
-        encoding="utf-8"
-    )
+    html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
     out = normalize_html(html)
     assert "Redispatch" in out  # main content kept
     assert "Fortentwicklung" in out  # main content kept

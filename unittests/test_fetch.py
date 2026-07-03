@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 from aioresponses import aioresponses
+
 from bnetza_bk6_scraper.fetch import _HEADERS, Fetcher
 
 

@@ -27,9 +27,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
     def __init__(self, concurrency: int = 4) -> None:
         self._concurrency = concurrency
 
-    async def mirror(
-        self, target_dir: str | Path, year: int | None = None
-    ) -> list[Proceeding]:
+    async def mirror(self, target_dir: str | Path, year: int | None = None) -> list[Proceeding]:
         """Download all (or one year's) BK6 proceedings into target_dir."""
         target = Path(target_dir)
         target.mkdir(parents=True, exist_ok=True)
@@ -49,8 +47,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             selected: list[tuple[str, list[str]]] = [
                 (aktenzeichen, page_urls)
                 for aktenzeichen, page_urls in by_az.items()
-                if year is None
-                or aktenzeichen.startswith(f"BK6-{year % 100:02d}-")
+                if year is None or aktenzeichen.startswith(f"BK6-{year % 100:02d}-")
             ]
             attempted = len(selected)
 
@@ -58,9 +55,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             # bounds the actual HTTP concurrency, so --concurrency takes effect.
             results = await asyncio.gather(
                 *(
-                    self._safe_mirror_proceeding(
-                        fetcher, aktenzeichen, page_urls, target
-                    )
+                    self._safe_mirror_proceeding(fetcher, aktenzeichen, page_urls, target)
                     for aktenzeichen, page_urls in selected
                 )
             )
@@ -86,9 +81,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
     ) -> Proceeding | None:
         """Mirror one proceeding, logging and swallowing failures so the run continues."""
         try:
-            return await self._mirror_proceeding(
-                fetcher, aktenzeichen, page_urls, target
-            )
+            return await self._mirror_proceeding(fetcher, aktenzeichen, page_urls, target)
         except Exception:  # pylint: disable=broad-except
             _logger.warning("failed to mirror %s", aktenzeichen, exc_info=True)
             return None
@@ -110,16 +103,12 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             pages.append(ProceedingPage(phase=phase, source_url=url))
             folder = target / str(parsed.year) / aktenzeichen
             folder.mkdir(parents=True, exist_ok=True)
-            (folder / f"{aktenzeichen}_{phase}.html").write_text(
-                normalize_html(html), encoding="utf-8"
-            )
+            (folder / f"{aktenzeichen}_{phase}.html").write_text(normalize_html(html), encoding="utf-8")
             if merged is None:
                 merged = parsed
             else:
                 seen = {d.filename for d in merged.documents}
-                merged.documents += [
-                    d for d in parsed.documents if d.filename not in seen
-                ]
+                merged.documents += [d for d in parsed.documents if d.filename not in seen]
         assert merged is not None
         merged.pages = pages
 
@@ -129,9 +118,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
                 data = await fetcher.get_bytes(doc.source_url)
                 (folder / doc.filename).write_bytes(data)
             except Exception:  # pylint: disable=broad-except
-                _logger.warning(
-                    "failed to download %s", doc.source_url, exc_info=True
-                )
+                _logger.warning("failed to download %s", doc.source_url, exc_info=True)
                 continue
         (folder / "metadata.json").write_text(
             json.dumps(merged.model_dump(mode="json"), indent=2, ensure_ascii=False),
@@ -153,6 +140,4 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             }
             for p in sorted(proceedings, key=lambda p: p.aktenzeichen)
         ]
-        (target / "index.json").write_text(
-            json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        (target / "index.json").write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
