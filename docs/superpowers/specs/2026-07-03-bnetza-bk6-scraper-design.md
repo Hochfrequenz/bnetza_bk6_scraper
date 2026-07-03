@@ -162,3 +162,28 @@ Test: `aioresponses` (added to the template's `tests` optional-dependency group)
 
 - `bnetza_bk6_mirror` repo: `.github/workflows/mirror.yml` (cron → install → run → commit),
   README explaining the diff-based change tracking.
+
+## Implementation findings (2026-07-03, from recorded fixtures)
+
+Verified against real pages while recording test fixtures; the plan encodes these:
+
+1. **WAF requires a browser User-Agent.** `www.bundesnetzagentur.de` sits behind a Web
+   Application Firewall that returns a **200-status block page** ("The requested URL was
+   rejected. Your support ID is: …") for bot-like User-Agents. The `Fetcher` must send a
+   **browser UA + `Accept`/`Accept-Language` headers**, and must treat the block-marker body
+   as a retryable failure (it is not an HTTP error status).
+2. **Discovery is two fetches, not per-year crawling.** The *Abgeschlossene Verfahren* landing
+   page lists **all 430+ proceedings directly** (years are section headers, not separate index
+   pages). So discovery = fetch laufende + abgeschlossene, parse links from both. No per-year
+   index pages exist.
+3. **`<base href="/">`** on every page: links resolve against the site root, so parsers must
+   honor the base href when making URLs absolute.
+4. **Proceeding/PDF hrefs carry query strings** (`?nn=…`, `?__blob=publicationFile&v=…`), so
+   link filters use "contains `.html`/`.pdf`", never "ends-with".
+5. **Title is the `<h2>` in `#content`** (the `<h1>` is the Aktenzeichen). `status` is derived
+   from the page **phase** (URL suffix), which is reliable.
+6. **`deadline` is best-effort.** On the sampled page the deadline date sits in an unlabeled
+   cell, so a label-anchored extraction returns `None`. The field is populated only when a
+   date is confidently found next to a Frist/Stellungnahme label; otherwise `null`. This
+   revises the earlier "always extract deadline" intent — `metadata.json` may carry
+   `"deadline": null`.

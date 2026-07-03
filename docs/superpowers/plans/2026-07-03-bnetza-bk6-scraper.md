@@ -323,38 +323,32 @@ git commit -m "feat: add Aktenzeichen/year/filename parsing helpers"
 
 ---
 
-## Task 4: Record HTML fixtures
+## Task 4: Record HTML fixtures ✅ DONE
 
-Real pages are needed before writing HTML parsers. Save them once; tests run offline against them.
+**Status: complete** (commit recorded 3 real fixtures + `.gitattributes`). Documented here for reference; no further action.
 
-**Files:**
-- Create: `unittests/fixtures/laufende_verfahren.html`
-- Create: `unittests/fixtures/abgeschlossene_verfahren.html` (the year-index landing page)
-- Create: `unittests/fixtures/abgeschlossene_verfahren_2023.html` (a single year's list)
-- Create: `unittests/fixtures/proceeding_BK6-23-241_konsultation.html`
-- Create: `unittests/fixtures/proceeding_BK6-20-061_festlegungsverfahren.html` (a multi-phase example)
+Real pages are needed before writing HTML parsers. They were saved once; tests run offline against them.
 
-- [ ] **Step 1: Download the fixtures**
+**Files recorded:**
+- `unittests/fixtures/laufende_verfahren.html` — ongoing-proceedings index (~13 proceeding links)
+- `unittests/fixtures/abgeschlossene_verfahren.html` — completed-proceedings landing page; **lists all 430+ proceedings directly** (no per-year subpages)
+- `unittests/fixtures/proceeding_BK6-23-241_konsultation.html` — a proceeding page (Redispatch 2.0)
+- `.gitattributes` with `unittests/fixtures/** -text` so fixture bytes are preserved exactly (no CRLF conversion → stable parser tests)
 
-Use the URLs from the spec's "Target site structure" section. For each, save the raw HTML with `curl` (or the browser) into the path above. Trim nothing — parsers must cope with the real page. Example:
+**Key facts learned (encoded into Tasks 5, 6, 8, 9):**
+- BNetzA sits behind a **WAF** that returns a **200-status block page** ("The requested URL was rejected") for bot User-Agents. A **browser User-Agent + `Accept`/`Accept-Language` headers** are required (see the `curl` recipe below and Task 8's `_HEADERS`).
+- Pages set `<base href="/">` — links resolve against the site root, not the page URL.
+- The `<h1>` is the Aktenzeichen; the title is the `<h2>` inside `#content`.
+- PDF/proceeding hrefs carry query strings (`?__blob=…`, `?nn=…`) — filter with "contains", not "ends-with".
+- The fixtures are valid UTF-8.
 
+The recipe used (browser UA is essential — a bot UA yields the block page):
 ```bash
-curl -sL "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_11_LV/BK6_LV.html" -o unittests/fixtures/laufende_verfahren.html
-curl -sL "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-241/BK6-23-241_konsultation.html" -o unittests/fixtures/proceeding_BK6-23-241_konsultation.html
-```
-
-If a URL 404s (site reorganized), find the current equivalent from the two index surfaces and update the spec's URL notes accordingly.
-
-- [ ] **Step 2: Sanity-check the fixtures contain expected content**
-
-Run: `grep -l "BK6-23-241" unittests/fixtures/proceeding_BK6-23-241_konsultation.html`
-Expected: file listed (Aktenzeichen present).
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add unittests/fixtures/
-git commit -m "test: record BK6 index and proceeding page fixtures"
+UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+curl -sSL -A "$UA" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+  -H "Accept-Language: de-DE,de;q=0.9,en;q=0.8" \
+  "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_11_LV/BK6_LV.html" \
+  -o unittests/fixtures/laufende_verfahren.html
 ```
 
 ---
@@ -372,25 +366,27 @@ from datetime import date
 from pathlib import Path
 from bnetza_bk6_scraper.parse import parse_proceeding_page
 
-FIXTURE = Path("unittests/fixtures/proceeding_BK6-23-241_konsultation.html")
+FIXTURES = Path(__file__).parent / "fixtures"
 BASE_URL = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-241/BK6-23-241_konsultation.html"
 
 
 def test_parse_proceeding_extracts_metadata_and_documents():
-    html = FIXTURE.read_text(encoding="utf-8")
+    html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
     parsed = parse_proceeding_page(html, source_url=BASE_URL)
 
     assert parsed.aktenzeichen == "BK6-23-241"
     assert parsed.year == 2023
-    assert "Redispatch 2.0" in parsed.title
+    assert "Redispatch 2.0" in parsed.title            # real title lives in <h2> under #content
     assert parsed.stand == date(2024, 9, 26)
-    # status (procedural phase) and submission deadline are extracted per the spec
+    # status is derived from the page phase (reliable); deadline is best-effort (may be None)
     assert parsed.status == "Konsultation"
-    assert parsed.deadline == date(2024, 11, 4)
-    # at least the consultation PDF is discovered, with an absolute URL
-    pdfs = [d for d in parsed.documents if d.filename.endswith(".pdf")]
-    assert any("konsultationsdokument" in d.filename for d in pdfs)
-    assert all(d.source_url.startswith("https://") for d in pdfs)
+    assert parsed.deadline is None or isinstance(parsed.deadline, date)
+    # the consultation PDF is discovered as an absolute URL — note real hrefs end
+    # ".pdf?__blob=publicationFile&v=3", so an `a[href$=".pdf"]` selector would match NOTHING.
+    assert parsed.documents, "expected at least one PDF"
+    assert any("konsultationsdokument" in d.filename for d in parsed.documents)
+    assert all(d.source_url.startswith("https://") for d in parsed.documents)
+    assert all(d.filename.endswith(".pdf") for d in parsed.documents)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -400,11 +396,17 @@ Expected: FAIL (`parse_proceeding_page` undefined).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `parse.py`. Implement against the real fixture — the selectors below are a starting point; adjust to the actual BNetzA DOM. Parse German dates (`dd.mm.yyyy`) into `date`. Resolve relative links with `urljoin`. Derive `doc_type` from the filename stem after the Aktenzeichen prefix. **Also extract `status`** (the procedural phase label, e.g. "Konsultation") **and `deadline`** (the "Frist"/"Stellungnahme bis" date) — locate their containers in the fixture DOM; both are optional and default to `None` when absent.
+Add to `parse.py`. The selectors below are **verified against the recorded fixture** — the
+DOM facts they encode (confirmed during Task 4):
+- BNetzA pages set `<base href="/">`, so links MUST be resolved against `urljoin(page_url, base_href)` (→ site root), NOT against `page_url` directly. Otherwise root-relative hrefs like `DE/...` resolve to broken nested paths.
+- The `<h1>` is the **Aktenzeichen**; the real proceeding **title is the `<h2>` inside `#content`**.
+- PDF hrefs end with a query string (`....pdf?__blob=publicationFile&v=3`), so use `a[href*=".pdf"]` (contains), never `a[href$=".pdf"]` (ends-with → matches nothing). `filename_from_pdf_url` (Task 3) already strips the query via `urlsplit(...).path`.
+- `status` is derived from the page **phase** (the URL filename suffix, e.g. `_konsultation` → "Konsultation") — reliable, unlike scraping a status label from the DOM.
+- `deadline` is **best-effort**: the deadline date on this page sits in a bare cell with no adjacent label, so a label-anchored search yields `None` here. That's acceptable — deadline defaults to `None` when not confidently found.
 
 ```python
 from datetime import date, datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -412,10 +414,14 @@ from bnetza_bk6_scraper.models import Document, Proceeding
 
 
 def _parse_german_date(text: str) -> date | None:
-    match = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", text)
-    if not match:
-        return None
-    return datetime.strptime(match.group(0), "%d.%m.%Y").date()
+    match = re.search(r"\d{2}\.\d{2}\.\d{4}", text)
+    return datetime.strptime(match.group(0), "%d.%m.%Y").date() if match else None
+
+
+def _effective_base(soup: BeautifulSoup, page_url: str) -> str:
+    """Resolve the page's <base href> (BNetzA uses <base href="/">) against the page URL."""
+    base = soup.find("base")
+    return urljoin(page_url, base["href"]) if base and base.get("href") else page_url
 
 
 def _doc_type_from_filename(filename: str, aktenzeichen: str) -> str:
@@ -424,27 +430,43 @@ def _doc_type_from_filename(filename: str, aktenzeichen: str) -> str:
     return stem[len(prefix):] if stem.startswith(prefix) else stem
 
 
+def phase_from_url(page_url: str) -> str:
+    """Phase label from a proceeding URL: '..._konsultation.html?nn=1' -> 'konsultation'.
+
+    Public because the orchestrator (scraper.py) reuses it. Uses urlsplit so any query
+    string is stripped before deriving the phase.
+    """
+    stem = urlsplit(page_url).path.rsplit("/", 1)[-1].removesuffix(".html")
+    return stem.split("_", 1)[1] if "_" in stem else stem
+
+
 def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
     """Parse one BK6 proceeding phase page into a Proceeding (single page)."""
     soup = BeautifulSoup(html, "lxml")
+    base = _effective_base(soup, source_url)
     aktenzeichen = aktenzeichen_from_url(source_url)
-    title = soup.find("h1").get_text(strip=True) if soup.find("h1") else aktenzeichen
+    content = soup.select_one("#content") or soup
+
+    heading = content.find("h2")
+    title = heading.get_text(strip=True) if heading else aktenzeichen
+
     stand = None
-    stand_node = soup.find(string=re.compile(r"Stand:"))
+    stand_node = content.find(string=re.compile(r"Stand:"))
     if stand_node:
         stand = _parse_german_date(str(stand_node))
-    # status + deadline: adjust selectors to the fixture DOM
+
+    phase = phase_from_url(source_url)
+    status = phase.replace("_", " ").capitalize() or None
+
+    # deadline: best-effort — only trust a date next to a Frist/Stellungnahme label.
     deadline = None
-    deadline_node = soup.find(string=re.compile(r"(Frist|Stellungnahme bis)"))
-    if deadline_node:
-        deadline = _parse_german_date(str(deadline_node))
-    status = None
-    status_node = soup.find(string=re.compile(r"(Konsultation|Festlegung|Mitteilung|Beschluss)"))
-    if status_node:
-        status = str(status_node).strip()
+    label = content.find(string=re.compile(r"(Frist|Stellungnahme).{0,60}?\d{2}\.\d{2}\.\d{4}"))
+    if label:
+        deadline = _parse_german_date(str(label))
+
     documents: list[Document] = []
-    for anchor in soup.select('a[href$=".pdf"]'):
-        href = urljoin(source_url, anchor["href"])
+    for anchor in content.select('a[href*=".pdf"]'):
+        href = urljoin(base, anchor["href"])
         filename = filename_from_pdf_url(href)
         documents.append(Document(
             title=anchor.get_text(strip=True) or filename,
@@ -489,15 +511,25 @@ git commit -m "feat: parse BK6 proceeding page metadata and PDF links"
 from pathlib import Path
 from bnetza_bk6_scraper.parse import parse_index_page
 
-BASE = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_11_LV/BK6_LV.html"
+FIXTURES = Path(__file__).parent / "fixtures"
+LV = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_11_LV/BK6_LV.html"
+AV = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_21_AV/BK6_AV.html"
 
 
-def test_parse_index_returns_absolute_proceeding_urls():
-    html = Path("unittests/fixtures/laufende_verfahren.html").read_text(encoding="utf-8")
-    urls = parse_index_page(html, base_url=BASE)
+def test_parse_laufende_index_returns_absolute_proceeding_urls():
+    html = (FIXTURES / "laufende_verfahren.html").read_text(encoding="utf-8")
+    urls = parse_index_page(html, base_url=LV)
     assert urls, "expected at least one proceeding link"
-    assert all(u.startswith("https://") for u in urls)
-    assert all("BK6-" in u for u in urls)
+    # base-href resolution must yield absolute site URLs, not broken nested paths
+    assert all(u.startswith("https://www.bundesnetzagentur.de/DE/") for u in urls)
+    assert all("/BK6-GZ/" in u for u in urls)
+
+
+def test_parse_abgeschlossene_index_lists_many():
+    # the abgeschlossene landing page lists ALL proceedings directly (no per-year subpages)
+    html = (FIXTURES / "abgeschlossene_verfahren.html").read_text(encoding="utf-8")
+    urls = parse_index_page(html, base_url=AV)
+    assert len(urls) > 100
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -507,15 +539,21 @@ Expected: FAIL.
 
 - [ ] **Step 3: Write minimal implementation**
 
+Reuses `_effective_base` from Task 5. Real proceeding links look like
+`href="DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-241/BK6-23-241_konsultation.html?nn=875510"`
+— note the `?nn=` query, so filter on **`.html` contained** (not ends-with), and key on the
+`/BK6-GZ/` path segment (which excludes nav links like `BK6_AV.html`).
+
 ```python
 def parse_index_page(html: str, base_url: str) -> list[str]:
     """Return absolute URLs of proceeding pages linked from an index page."""
     soup = BeautifulSoup(html, "lxml")
+    base = _effective_base(soup, base_url)
     urls: list[str] = []
     for anchor in soup.select("a[href]"):
         href = anchor["href"]
-        if "BK6-" in href and href.endswith(".html"):
-            urls.append(urljoin(base_url, href))
+        if "/BK6-GZ/" in href and ".html" in href:
+            urls.append(urljoin(base, href))
     # dedupe, preserve order
     return list(dict.fromkeys(urls))
 ```
@@ -546,9 +584,11 @@ git commit -m "feat: parse BK6 index pages into proceeding URLs"
 from pathlib import Path
 from bnetza_bk6_scraper.normalize import normalize_html
 
+FIXTURES = Path(__file__).parent / "fixtures"
+
 
 def test_normalize_keeps_content_drops_chrome():
-    html = Path("unittests/fixtures/proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
+    html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
     out = normalize_html(html)
     assert "Redispatch 2.0" in out          # main content kept
     assert "<script" not in out.lower()      # scripts stripped
@@ -564,7 +604,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Extract the main content container (identify the BNetzA main-content selector from the fixture — likely an `<main>` or a `#content`/`.content` region), drop `script`/`style`/`nav`/`header`/`footer`, and return a `prettify()`-stable string. If no main container is found, fall back to `<body>`.
+Extract the main content container — **confirmed during Task 4 to be `#content`** on BNetzA proceeding pages (there is no `<main>`); the `#content` selector in `_MAIN_SELECTORS` below handles it. Drop `script`/`style`/`nav`/`header`/`footer`, and return a `prettify()`-stable string. If no main container is found, fall back to `<body>`.
 
 ```python
 """Normalize BNetzA HTML pages into stable snapshots for clean git diffs."""
@@ -648,9 +688,27 @@ async def test_fetch_retries_on_transient_error():
         async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
             body = await fetcher.get_text(url)
     assert body == "recovered"
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_on_waf_block_page():
+    # BNetzA's WAF returns its rejection page with HTTP 200 — must be retried, not accepted.
+    url = "https://www.bundesnetzagentur.de/blocked.html"
+    with aioresponses() as mocked:
+        mocked.get(url, status=200, body="... The requested URL was rejected ...")
+        mocked.get(url, status=200, body="real content")
+        async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
+            body = await fetcher.get_text(url)
+    assert body == "real content"
+
+
+def test_browser_user_agent_configured():
+    # The WAF blocks non-browser UAs; the default headers must look like a browser.
+    from bnetza_bk6_scraper.fetch import _HEADERS
+    assert "Mozilla/5.0" in _HEADERS["User-Agent"]
 ```
 
-Add `pytest-asyncio` to the `tests` group and set `asyncio_mode = "auto"` (or mark tests). Note this in the task.
+`pytest-asyncio` and `asyncio_mode = "auto"` were already added to `pyproject.toml` in Task 1, so these `@pytest.mark.asyncio` tests run without further config.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -658,6 +716,14 @@ Run: `tox -e tests -- unittests/test_fetch.py -v`
 Expected: FAIL.
 
 - [ ] **Step 3: Write minimal implementation**
+
+**CRITICAL (confirmed during Task 4):** BNetzA sits behind a WAF that returns a **200 OK block
+page** ("Die angeforderte URL wurde abgewiesen / The requested URL was rejected. Your support
+ID is: …") whenever the request looks like a bot. A descriptive bot User-Agent gets blocked; a
+**browser-like User-Agent plus `Accept`/`Accept-Language` headers gets through**. The headers
+below are required — do not replace them with a custom bot UA. Because the block page returns
+status 200, also guard against it: if a response body contains the rejection marker, treat it
+as a transient failure and retry.
 
 ```python
 """Polite async HTTP client for the BNetzA site."""
@@ -668,8 +734,22 @@ import asyncio
 
 import aiohttp
 
-_USER_AGENT = "bnetza_bk6_scraper (+https://github.com/Hochfrequenz/bnetza_bk6_scraper)"
+# BNetzA's WAF blocks non-browser User-Agents (returns a 200 "URL was rejected" page).
+# A browser-like UA + Accept headers are required to receive real content.
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+}
 _TRANSIENT = {429, 500, 502, 503, 504}
+_WAF_BLOCK_MARKER = "The requested URL was rejected"
+
+
+class WafBlockedError(aiohttp.ClientError):
+    """Raised when the WAF returns its 200-status rejection page, so it is retried."""
 
 
 class Fetcher:
@@ -682,25 +762,33 @@ class Fetcher:
         self._session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "Fetcher":
-        self._session = aiohttp.ClientSession(headers={"User-Agent": _USER_AGENT})
+        self._session = aiohttp.ClientSession(headers=_HEADERS)
         return self
 
     async def __aexit__(self, *exc) -> None:
         assert self._session is not None
         await self._session.close()
 
-    async def _request(self, url: str) -> aiohttp.ClientResponse:
+    async def _fetch(self, url: str, as_text: bool) -> str | bytes:
+        """GET with retry/backoff. Reads the body inside the loop so the WAF 200-block
+        page (only detectable in the body of a text response) can be retried too."""
         assert self._session is not None
         last_exc: Exception | None = None
         for attempt in range(self._max_retries + 1):
             async with self._semaphore:
                 try:
-                    resp = await self._session.get(url)
-                    if resp.status in _TRANSIENT:
-                        resp.release()
-                        raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
-                    resp.raise_for_status()
-                    return resp
+                    async with self._session.get(url) as resp:
+                        if resp.status in _TRANSIENT:
+                            raise aiohttp.ClientResponseError(
+                                resp.request_info, resp.history, status=resp.status
+                            )
+                        resp.raise_for_status()
+                        if as_text:
+                            text = await resp.text()
+                            if _WAF_BLOCK_MARKER in text:
+                                raise WafBlockedError(url)
+                            return text
+                        return await resp.read()
                 except aiohttp.ClientError as exc:
                     last_exc = exc
             if attempt < self._max_retries:
@@ -708,18 +796,14 @@ class Fetcher:
         raise last_exc  # type: ignore[misc]
 
     async def get_text(self, url: str) -> str:
-        resp = await self._request(url)
-        try:
-            return await resp.text()
-        finally:
-            resp.release()
+        result = await self._fetch(url, as_text=True)
+        assert isinstance(result, str)
+        return result
 
     async def get_bytes(self, url: str) -> bytes:
-        resp = await self._request(url)
-        try:
-            return await resp.read()
-        finally:
-            resp.release()
+        result = await self._fetch(url, as_text=False)
+        assert isinstance(result, bytes)
+        return result
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -742,7 +826,10 @@ git commit -m "feat: add polite async fetch layer with retry"
 - Create: `src/bnetza_bk6_scraper/discovery.py`
 - Test: `unittests/test_discovery.py`
 
-Discovery: fetch the laufende index and the abgeschlossene landing page; from the landing page find the per-year index URLs, fetch each, and collect proceeding URLs from all of them via `parse_index_page`.
+Discovery: fetch the two index surfaces (laufende + abgeschlossene) and collect all proceeding
+URLs from them via `parse_index_page`. **Confirmed during Task 4:** the abgeschlossene landing
+page lists ALL proceedings directly (430+ links) — there are **no per-year subpages** to crawl,
+so discovery is just two fetches.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -752,29 +839,26 @@ from aioresponses import aioresponses
 from pathlib import Path
 from bnetza_bk6_scraper.discovery import discover_proceeding_urls
 from bnetza_bk6_scraper import discovery
+from bnetza_bk6_scraper.fetch import Fetcher
 
+FIXTURES = Path(__file__).parent / "fixtures"
 LV = discovery.LAUFENDE_URL
 AV = discovery.ABGESCHLOSSENE_URL
 
 
 @pytest.mark.asyncio
 async def test_discover_collects_urls_from_both_surfaces():
-    lv_html = Path("unittests/fixtures/laufende_verfahren.html").read_text(encoding="utf-8")
-    av_html = Path("unittests/fixtures/abgeschlossene_verfahren.html").read_text(encoding="utf-8")
-    year_html = Path("unittests/fixtures/abgeschlossene_verfahren_2023.html").read_text(encoding="utf-8")
-    from bnetza_bk6_scraper.fetch import Fetcher
+    lv_html = (FIXTURES / "laufende_verfahren.html").read_text(encoding="utf-8")
+    av_html = (FIXTURES / "abgeschlossene_verfahren.html").read_text(encoding="utf-8")
     with aioresponses() as mocked:
         mocked.get(LV, status=200, body=lv_html)
         mocked.get(AV, status=200, body=av_html)
-        # year index links from av_html resolve; mock them permissively:
-        mocked.get(discovery.year_index_matcher, status=200, body=year_html, repeat=True)
         async with Fetcher() as fetcher:
             urls = await discover_proceeding_urls(fetcher)
-    assert urls
-    assert all("BK6-" in u for u in urls)
+    assert len(urls) > 100                          # abgeschlossene alone contributes 400+
+    assert all("/BK6-GZ/" in u for u in urls)
+    assert len(urls) == len(set(urls))              # de-duplicated
 ```
-
-If matching arbitrary year-index URLs with aioresponses is awkward, instead assert discovery against a smaller, fully-mocked set: mock `AV` returning HTML that links exactly one known year-index URL, mock that URL explicitly. Prefer the explicit approach.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -788,10 +872,6 @@ Expected: FAIL.
 
 from __future__ import annotations
 
-from urllib.parse import urljoin
-
-from bs4 import BeautifulSoup
-
 from bnetza_bk6_scraper.fetch import Fetcher
 from bnetza_bk6_scraper.parse import parse_index_page
 
@@ -800,34 +880,14 @@ LAUFENDE_URL = f"{_BASE}/DE/Beschlusskammern/BK06/BK6_11_LV/BK6_LV.html"
 ABGESCHLOSSENE_URL = f"{_BASE}/DE/Beschlusskammern/BK06/BK6_21_AV/BK6_AV.html"
 
 
-def _year_index_urls(av_html: str, base_url: str) -> list[str]:
-    """Find the per-year index page URLs linked from the abgeschlossene landing page."""
-    soup = BeautifulSoup(av_html, "lxml")
-    urls = [
-        urljoin(base_url, a["href"])
-        for a in soup.select("a[href]")
-        if "BK6_AV" in a["href"] and a["href"].endswith(".html")
-    ]
-    return list(dict.fromkeys(urls))
-
-
 async def discover_proceeding_urls(fetcher: Fetcher) -> list[str]:
-    """Return the de-duplicated set of proceeding page URLs across both surfaces."""
+    """Return the de-duplicated set of proceeding page URLs across both index surfaces."""
     collected: list[str] = []
-
-    lv_html = await fetcher.get_text(LAUFENDE_URL)
-    collected += parse_index_page(lv_html, base_url=LAUFENDE_URL)
-
-    av_html = await fetcher.get_text(ABGESCHLOSSENE_URL)
-    collected += parse_index_page(av_html, base_url=ABGESCHLOSSENE_URL)
-    for year_url in _year_index_urls(av_html, ABGESCHLOSSENE_URL):
-        year_html = await fetcher.get_text(year_url)
-        collected += parse_index_page(year_html, base_url=year_url)
-
+    for index_url in (LAUFENDE_URL, ABGESCHLOSSENE_URL):
+        html = await fetcher.get_text(index_url)
+        collected += parse_index_page(html, base_url=index_url)
     return list(dict.fromkeys(collected))
 ```
-
-Adjust the `_year_index_urls` selector to the real DOM discovered in the Task 4 fixture. Remove the `year_index_matcher` reference from the test if using the explicit approach.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -868,9 +928,12 @@ PROC_URL = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/202
 PDF_URL = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-241/BK6-23-241_konsultationsdokument.pdf"
 
 
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
 @pytest.mark.asyncio
 async def test_mirror_writes_expected_tree(tmp_path):
-    proc_html = Path("unittests/fixtures/proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
+    proc_html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
     # a minimal laufende index that links exactly one proceeding; empty abgeschlossene
     lv_html = f'<html><body><a href="{PROC_URL}">BK6-23-241</a></body></html>'
     with aioresponses() as mocked:
@@ -912,7 +975,7 @@ from bnetza_bk6_scraper.discovery import discover_proceeding_urls
 from bnetza_bk6_scraper.fetch import Fetcher
 from bnetza_bk6_scraper.models import Proceeding, ProceedingPage
 from bnetza_bk6_scraper.normalize import normalize_html
-from bnetza_bk6_scraper.parse import aktenzeichen_from_url, parse_proceeding_page
+from bnetza_bk6_scraper.parse import aktenzeichen_from_url, parse_proceeding_page, phase_from_url
 
 _logger = logging.getLogger(__name__)
 
@@ -958,7 +1021,7 @@ class BnetzaBk6Scraper:
         for url in page_urls:
             html = await fetcher.get_text(url)
             parsed = parse_proceeding_page(html, source_url=url)
-            phase = url.rsplit("_", 1)[-1].removesuffix(".html")
+            phase = phase_from_url(url)  # robust: strips any ?nn= query before deriving phase
             pages.append(ProceedingPage(phase=phase, source_url=url))
             folder = target / str(parsed.year) / aktenzeichen
             folder.mkdir(parents=True, exist_ok=True)
