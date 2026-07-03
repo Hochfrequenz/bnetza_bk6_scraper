@@ -50,6 +50,9 @@ class Proceeding(BaseModel):
     title: str
     """Proceeding title (the ``<h2>`` of the page), e.g. ``"Fortentwicklung des sog. „Redispatch 2.0“"``."""
     stand: date | None = None
+    """The page's *"Stand:"* revision date, parsed from the German ``dd.mm.yyyy`` format
+    into a :class:`datetime.date` (e.g. ``Stand: 26.09.2024`` -> ``date(2024, 9, 26)``).
+    ``None`` when the page carries no *Stand* marker."""
 
     status: str | None = None
     """Procedural phase label derived from the page URL, e.g. ``"Konsultation"``, ``"Beschluss"``."""
