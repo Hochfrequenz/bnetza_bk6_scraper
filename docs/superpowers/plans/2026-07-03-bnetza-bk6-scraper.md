@@ -25,6 +25,18 @@
 - `unittests/fixtures/` — recorded HTML/PDF samples
 - `unittests/test_*.py` — one test module per source module
 
+**Fixture paths (important):** the `coverage` tox env runs with `changedir = unittests`, so
+cwd-relative paths like `Path("unittests/fixtures/...")` break there. Every test that reads a
+fixture MUST resolve it relative to the test file:
+
+```python
+FIXTURES = Path(__file__).parent / "fixtures"
+```
+
+and read e.g. `(FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")`.
+The test snippets below use `Path("unittests/fixtures/...")` for brevity — replace with the
+`FIXTURES` form in every test module.
+
 ---
 
 ## Task 1: Project setup — rename package, dependencies, entry point
@@ -34,6 +46,7 @@
 - Rename: `src/mypackage/` → `src/bnetza_bk6_scraper/` (keep `py.typed`)
 - Modify: `src/bnetza_bk6_scraper/__init__.py`
 - Modify: `pyproject.toml`
+- Modify: `tox.ini`
 
 - [ ] **Step 1: Move the package directory and drop example files**
 
@@ -82,6 +95,25 @@ tests = [
 ```
 
 Update the `[tool.hatch.build.hooks.vcs]` version-file path to `src/bnetza_bk6_scraper/_version.py` (and add that file to `.gitignore` if not covered).
+
+Also add pytest-asyncio config so the async tests (Task 8 onward) run:
+
+```toml
+tests = [
+    "pytest==9.1.1",
+    "pytest-asyncio",
+    "aioresponses",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+```
+
+- [ ] **Step 2b: Update `tox.ini` to reference the renamed package**
+
+The template hardcodes `mypackage` in two envs that `tox` runs (Task 12). Update:
+- `[testenv:linting]`: `pylint mypackage` → `pylint bnetza_bk6_scraper`
+- `[testenv:type_check]`: `mypy --show-error-codes src/mypackage --strict` → `mypy --show-error-codes src/bnetza_bk6_scraper --strict`
 
 - [ ] **Step 3: Replace `__init__.py` with a placeholder export surface**
 
@@ -352,6 +384,9 @@ def test_parse_proceeding_extracts_metadata_and_documents():
     assert parsed.year == 2023
     assert "Redispatch 2.0" in parsed.title
     assert parsed.stand == date(2024, 9, 26)
+    # status (procedural phase) and submission deadline are extracted per the spec
+    assert parsed.status == "Konsultation"
+    assert parsed.deadline == date(2024, 11, 4)
     # at least the consultation PDF is discovered, with an absolute URL
     pdfs = [d for d in parsed.documents if d.filename.endswith(".pdf")]
     assert any("konsultationsdokument" in d.filename for d in pdfs)
@@ -365,7 +400,7 @@ Expected: FAIL (`parse_proceeding_page` undefined).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add to `parse.py`. Implement against the real fixture — the selectors below are a starting point; adjust to the actual BNetzA DOM. Parse German dates (`dd.mm.yyyy`) into `date`. Resolve relative links with `urljoin`. Derive `doc_type` from the filename stem after the Aktenzeichen prefix.
+Add to `parse.py`. Implement against the real fixture — the selectors below are a starting point; adjust to the actual BNetzA DOM. Parse German dates (`dd.mm.yyyy`) into `date`. Resolve relative links with `urljoin`. Derive `doc_type` from the filename stem after the Aktenzeichen prefix. **Also extract `status`** (the procedural phase label, e.g. "Konsultation") **and `deadline`** (the "Frist"/"Stellungnahme bis" date) — locate their containers in the fixture DOM; both are optional and default to `None` when absent.
 
 ```python
 from datetime import date, datetime
@@ -398,6 +433,15 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
     stand_node = soup.find(string=re.compile(r"Stand:"))
     if stand_node:
         stand = _parse_german_date(str(stand_node))
+    # status + deadline: adjust selectors to the fixture DOM
+    deadline = None
+    deadline_node = soup.find(string=re.compile(r"(Frist|Stellungnahme bis)"))
+    if deadline_node:
+        deadline = _parse_german_date(str(deadline_node))
+    status = None
+    status_node = soup.find(string=re.compile(r"(Konsultation|Festlegung|Mitteilung|Beschluss)"))
+    if status_node:
+        status = str(status_node).strip()
     documents: list[Document] = []
     for anchor in soup.select('a[href$=".pdf"]'):
         href = urljoin(source_url, anchor["href"])
@@ -413,6 +457,8 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
         year=year_from_aktenzeichen(aktenzeichen),
         title=title,
         stand=stand,
+        status=status,
+        deadline=deadline,
         documents=documents,
     )
 ```
@@ -898,7 +944,12 @@ class BnetzaBk6Scraper:
                     _logger.warning("failed to mirror %s", aktenzeichen, exc_info=True)
 
         self._write_index(target, proceedings)
-        _logger.info("mirrored %d proceedings", len(proceedings))
+        doc_count = sum(len(p.documents) for p in proceedings)
+        failures = len(by_az) - len(proceedings)
+        _logger.info(
+            "run summary: %d proceedings, %d documents written, %d failures",
+            len(proceedings), doc_count, failures,
+        )
         return proceedings
 
     async def _mirror_proceeding(self, fetcher, aktenzeichen, page_urls, target) -> Proceeding:
