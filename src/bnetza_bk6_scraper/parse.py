@@ -100,3 +100,16 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
         deadline=deadline,
         documents=documents,
     )
+
+
+def parse_index_page(html: str, base_url: str) -> list[str]:
+    """Return absolute URLs of proceeding pages linked from an index page."""
+    soup = BeautifulSoup(html, "lxml")
+    base = _effective_base(soup, base_url)
+    urls: list[str] = []
+    for anchor in soup.select("a[href]"):
+        href = anchor["href"]
+        if "/BK6-GZ/" in href and ".html" in href:
+            urls.append(urljoin(base, href))
+    # dedupe, preserve order
+    return list(dict.fromkeys(urls))
