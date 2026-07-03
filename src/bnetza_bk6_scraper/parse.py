@@ -20,11 +20,19 @@ def _attr_str(tag: Tag, name: str) -> str | None:
 
 
 def aktenzeichen_from_url(url: str) -> str:
-    """Extract the Aktenzeichen (e.g. 'BK6-23-241') from a proceeding URL."""
-    match = _AKTENZEICHEN_RE.search(url)
-    if not match:
+    """Extract the Aktenzeichen (e.g. 'BK6-23-241') from a proceeding URL.
+
+    A BK6 URL normally contains the Aktenzeichen more than once (the directory *and* the
+    filename, e.g. ``.../BK6-23-241/BK6-23-241_konsultation.html``). We don't assume a single
+    occurrence: all occurrences must agree. If they don't, the URL is ambiguous and we raise
+    rather than silently picking the first.
+    """
+    found = {match.group("aktenzeichen") for match in _AKTENZEICHEN_RE.finditer(url)}
+    if not found:
         raise ValueError(f"no Aktenzeichen found in URL: {url}")
-    return match.group("aktenzeichen")
+    if len(found) > 1:
+        raise ValueError(f"conflicting Aktenzeichen {sorted(found)} in URL: {url}")
+    return found.pop()
 
 
 def year_from_aktenzeichen(aktenzeichen: str) -> int:
