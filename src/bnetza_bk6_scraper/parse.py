@@ -6,11 +6,17 @@ import re
 from datetime import date, datetime
 from urllib.parse import urljoin, urlsplit
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from bnetza_bk6_scraper.models import Document, Proceeding
 
 _AKTENZEICHEN_RE = re.compile(r"(BK6-\d{2}-\d{2,4})")
+
+
+def _attr_str(tag: Tag, name: str) -> str | None:
+    """Return a single string-valued attribute, or None (bs4 attrs are str | list[str])."""
+    value = tag.get(name)
+    return value if isinstance(value, str) else None
 
 
 def aktenzeichen_from_url(url: str) -> str:
@@ -40,7 +46,11 @@ def _parse_german_date(text: str) -> date | None:
 def _effective_base(soup: BeautifulSoup, page_url: str) -> str:
     """Resolve the page's <base href> (BNetzA uses <base href="/">) against the page URL."""
     base = soup.find("base")
-    return urljoin(page_url, base["href"]) if base and base.get("href") else page_url
+    if isinstance(base, Tag):
+        href = _attr_str(base, "href")
+        if href:
+            return urljoin(page_url, href)
+    return page_url
 
 
 def _doc_type_from_filename(filename: str, aktenzeichen: str) -> str:
@@ -83,7 +93,10 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
 
     documents: list[Document] = []
     for anchor in content.select('a[href*=".pdf"]'):
-        href = urljoin(base, anchor["href"])
+        href_attr = _attr_str(anchor, "href")
+        if href_attr is None:
+            continue
+        href = urljoin(base, href_attr)
         filename = filename_from_pdf_url(href)
         documents.append(Document(
             title=anchor.get_text(strip=True) or filename,
@@ -108,8 +121,8 @@ def parse_index_page(html: str, base_url: str) -> list[str]:
     base = _effective_base(soup, base_url)
     urls: list[str] = []
     for anchor in soup.select("a[href]"):
-        href = anchor["href"]
-        if "/BK6-GZ/" in href and ".html" in href:
+        href = _attr_str(anchor, "href")
+        if href and "/BK6-GZ/" in href and ".html" in href:
             urls.append(urljoin(base, href))
     # dedupe, preserve order
     return list(dict.fromkeys(urls))
