@@ -26,3 +26,20 @@ def test_year_from_aktenzeichen(az: str, expected: int) -> None:
 def test_filename_from_pdf_url() -> None:
     url = "/DE/.../BK6-23-241/BK6-23-241_konsultationsdokument.pdf"
     assert filename_from_pdf_url(url) == "BK6-23-241_konsultationsdokument.pdf"
+
+
+def test_aktenzeichen_from_url_raises_when_absent() -> None:
+    with pytest.raises(ValueError):
+        aktenzeichen_from_url("https://www.bundesnetzagentur.de/DE/no-aktenzeichen-here.html")
+
+
+def test_aktenzeichen_from_url_raises_on_conflicting_occurrences() -> None:
+    # two *different* Aktenzeichen in one URL is ambiguous -> raise rather than guess
+    url = "/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-241/BK6-24-999_x.html"
+    with pytest.raises(ValueError):
+        aktenzeichen_from_url(url)
+
+
+def test_year_from_aktenzeichen_raises_on_invalid() -> None:
+    with pytest.raises(ValueError):
+        year_from_aktenzeichen("not-an-aktenzeichen")
