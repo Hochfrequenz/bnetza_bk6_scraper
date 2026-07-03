@@ -10,7 +10,9 @@ from bs4 import BeautifulSoup, Tag
 
 from bnetza_bk6_scraper.models import Document, Proceeding
 
-_AKTENZEICHEN_RE = re.compile(r"(?P<aktenzeichen>BK6-\d{2}-\d{2,4})")
+# Named components make the shape self-documenting and let callers pull out the
+# two-digit year without re-splitting the string: BK6-<yy>-<sequence>, e.g. BK6-23-241.
+_AKTENZEICHEN_RE = re.compile(r"(?P<aktenzeichen>BK6-(?P<yy>\d{2})-(?P<sequence>\d{2,4}))")
 
 
 def _attr_str(tag: Tag, name: str) -> str | None:
@@ -36,8 +38,11 @@ def aktenzeichen_from_url(url: str) -> str:
 
 
 def year_from_aktenzeichen(aktenzeichen: str) -> int:
-    """Derive the 4-digit year from the two-digit year in the Aktenzeichen."""
-    two_digit = int(aktenzeichen.split("-")[1])
+    """Derive the 4-digit year from the two-digit year embedded in the Aktenzeichen."""
+    match = _AKTENZEICHEN_RE.search(aktenzeichen)
+    if not match:
+        raise ValueError(f"not a valid Aktenzeichen: {aktenzeichen}")
+    two_digit = int(match.group("yy"))
     return 2000 + two_digit if two_digit < 50 else 1900 + two_digit
 
 
