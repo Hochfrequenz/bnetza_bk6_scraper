@@ -81,6 +81,41 @@ procedural status, submission deadline, background text) and links one or more P
 
 5. Write a top-level `index.json` listing all proceedings for downstream consumption.
 
+**Year derivation.** The `laufende Verfahren` index has no year grouping, so `year` is taken
+authoritatively from the Aktenzeichen / source URL path (`BK6-23-241` → 2023), not from the
+index page a proceeding was discovered on.
+
+**Example `metadata.json`:**
+
+```json
+{
+  "aktenzeichen": "BK6-23-241",
+  "year": 2023,
+  "title": "Fortentwicklung des sog. 'Redispatch 2.0'",
+  "stand": "2024-09-26",
+  "status": "Konsultation",
+  "deadline": "2024-11-04",
+  "pages": [
+    { "phase": "konsultation", "source_url": ".../BK6-23-241_konsultation.html" }
+  ],
+  "documents": [
+    {
+      "title": "Konsultationsdokument",
+      "doc_type": "konsultationsdokument",
+      "source_url": ".../BK6-23-241_konsultationsdokument.pdf",
+      "filename": "BK6-23-241_konsultationsdokument.pdf"
+    }
+  ]
+}
+```
+
+`index.json` is an array of `{aktenzeichen, year, title, status, stand}` summaries with the
+relative path to each proceeding folder.
+
+If two phase pages link a PDF with an identical `{aktenzeichen}_{doctype}.pdf` name, it is
+treated as the same document (deduplicated); genuinely distinct documents are expected to
+carry distinct doctype suffixes.
+
 ## CLI (Typer)
 
 ```
