@@ -68,6 +68,24 @@ def phase_from_url(page_url: str) -> str:
     return stem.split("_", 1)[1] if "_" in stem else stem
 
 
+def _parse_documents(content: Tag, base: str, aktenzeichen: str) -> list[Document]:
+    """Build the list of PDF Documents linked from a proceeding page's content."""
+    documents: list[Document] = []
+    for anchor in content.select('a[href*=".pdf"]'):
+        href_attr = _attr_str(anchor, "href")
+        if href_attr is None:
+            continue
+        href = urljoin(base, href_attr)
+        filename = filename_from_pdf_url(href)
+        documents.append(Document(
+            title=anchor.get_text(strip=True) or filename,
+            doc_type=_doc_type_from_filename(filename, aktenzeichen),
+            source_url=href,
+            filename=filename,
+        ))
+    return documents
+
+
 def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
     """Parse one BK6 proceeding phase page into a Proceeding (single page)."""
     soup = BeautifulSoup(html, "lxml")
@@ -91,19 +109,7 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
     if label:
         deadline = _parse_german_date(str(label))
 
-    documents: list[Document] = []
-    for anchor in content.select('a[href*=".pdf"]'):
-        href_attr = _attr_str(anchor, "href")
-        if href_attr is None:
-            continue
-        href = urljoin(base, href_attr)
-        filename = filename_from_pdf_url(href)
-        documents.append(Document(
-            title=anchor.get_text(strip=True) or filename,
-            doc_type=_doc_type_from_filename(filename, aktenzeichen),
-            source_url=href,
-            filename=filename,
-        ))
+    documents = _parse_documents(content, base, aktenzeichen)
     return Proceeding(
         aktenzeichen=aktenzeichen,
         year=year_from_aktenzeichen(aktenzeichen),

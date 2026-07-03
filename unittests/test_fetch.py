@@ -1,6 +1,6 @@
 import pytest
 from aioresponses import aioresponses
-from bnetza_bk6_scraper.fetch import Fetcher
+from bnetza_bk6_scraper.fetch import _HEADERS, Fetcher
 
 
 @pytest.mark.asyncio
@@ -46,5 +46,4 @@ async def test_fetch_retries_on_waf_block_page() -> None:
 
 
 def test_browser_user_agent_configured() -> None:
-    from bnetza_bk6_scraper.fetch import _HEADERS
     assert "Mozilla/5.0" in _HEADERS["User-Agent"]

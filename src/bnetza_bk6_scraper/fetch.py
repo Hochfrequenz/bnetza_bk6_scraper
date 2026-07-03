@@ -70,11 +70,13 @@ class Fetcher:
         raise last_exc  # type: ignore[misc]
 
     async def get_text(self, url: str) -> str:
+        """GET the URL and return the decoded text body."""
         result = await self._fetch(url, as_text=True)
         assert isinstance(result, str)
         return result
 
     async def get_bytes(self, url: str) -> bytes:
+        """GET the URL and return the raw bytes body."""
         result = await self._fetch(url, as_text=False)
         assert isinstance(result, bytes)
         return result

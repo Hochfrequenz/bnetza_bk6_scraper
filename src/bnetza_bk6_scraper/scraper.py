@@ -40,11 +40,13 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             for url in urls:
                 by_az[aktenzeichen_from_url(url)].append(url)
 
+            attempted = 0
             for aktenzeichen, page_urls in by_az.items():
                 if year is not None and not aktenzeichen.startswith(
                     f"BK6-{year % 100:02d}-"
                 ):
                     continue
+                attempted += 1
                 try:
                     proceeding = await self._mirror_proceeding(
                         fetcher, aktenzeichen, page_urls, target
@@ -57,7 +59,7 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
 
         self._write_index(target, proceedings)
         doc_count = sum(len(p.documents) for p in proceedings)
-        failures = len(by_az) - len(proceedings)
+        failures = attempted - len(proceedings)
         _logger.info(
             "run summary: %d proceedings, %d documents written, %d failures",
             len(proceedings),
