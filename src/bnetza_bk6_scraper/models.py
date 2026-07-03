@@ -58,6 +58,9 @@ class Proceeding(BaseModel):
     """Procedural phase label derived from the page URL, e.g. ``"Konsultation"``, ``"Beschluss"``."""
 
     deadline: date | None = None
+    """Submission deadline (*"Frist zur Stellungnahme"*) for the consultation, as a German
+    ``dd.mm.yyyy`` date. **Inclusive**: statements are accepted up to and including this day.
+    Best-effort — ``None`` when no deadline is confidently found on the page."""
 
     pages: list[ProceedingPage] = []
     """All phase pages discovered for this Aktenzeichen."""
