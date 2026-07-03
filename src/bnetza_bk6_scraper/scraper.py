@@ -120,10 +120,9 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             except Exception:  # pylint: disable=broad-except
                 _logger.warning("failed to download %s", doc.source_url, exc_info=True)
                 continue
-        (folder / "metadata.json").write_text(
-            json.dumps(merged.model_dump(mode="json"), indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        # pydantic serializes straight to JSON (dates as ISO strings, non-ASCII preserved),
+        # so there's no need to round-trip through model_dump() + json.dumps().
+        (folder / "metadata.json").write_text(merged.model_dump_json(indent=2), encoding="utf-8")
         return merged
 
     @staticmethod
