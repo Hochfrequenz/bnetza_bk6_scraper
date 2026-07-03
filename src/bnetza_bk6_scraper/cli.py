@@ -24,12 +24,15 @@ def mirror(
     target: Path = typer.Option(..., "--target", help="Output directory (mirror repo root)."),
     concurrency: int = typer.Option(4, "--concurrency", help="Parallel fetches."),
     year: Optional[int] = typer.Option(None, "--year", help="Restrict to a single year."),
+    min_year: Optional[int] = typer.Option(
+        None, "--min-year", help="Skip proceedings older than this year (e.g. 2015)."
+    ),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Debug logging."),
 ) -> None:
     """Download BK6 proceedings into TARGET as a structured, diffable tree."""
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     scraper = BnetzaBk6Scraper(concurrency=concurrency)
-    asyncio.run(scraper.mirror(target, year=year))
+    asyncio.run(scraper.mirror(target, year=year, min_year=min_year))
 
 
 if __name__ == "__main__":

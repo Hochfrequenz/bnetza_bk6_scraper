@@ -128,6 +128,36 @@ async def test_mirror_processes_multiple_proceedings(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_mirror_min_year_skips_old_proceedings(tmp_path: Path) -> None:
+    old_url = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2018/"
+        "BK6-18-001/BK6-18-001_konsultation.html"
+    )
+    new_url = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        "BK6-23-001/BK6-23-001_konsultation.html"
+    )
+    lv_html = f'<html><body><a href="{old_url}">old</a><a href="{new_url}">new</a></body></html>'
+    with aioresponses() as mocked:
+        mocked.get(LV, status=200, body=lv_html)
+        mocked.get(AV, status=200, body="<html><body></body></html>")
+        mocked.get(new_url, status=200, body=_synthetic_proceeding_page("BK6-23-001"))
+        mocked.get(
+            "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/BK6-23-001/BK6-23-001_dok.pdf",
+            status=200,
+            body=b"%PDF-1.7 new",
+        )
+        # note: the 2018 proceeding page/PDF are intentionally NOT mocked — with min_year
+        # filtering at discovery, they must never be fetched.
+        scraper = BnetzaBk6Scraper()
+        proceedings = await scraper.mirror(tmp_path, min_year=2020)
+
+    assert {p.aktenzeichen for p in proceedings} == {"BK6-23-001"}
+    assert (tmp_path / "2023" / "BK6-23-001" / "metadata.json").exists()
+    assert not (tmp_path / "2018").exists()
+
+
+@pytest.mark.asyncio
 async def test_mirror_skips_index_link_without_aktenzeichen(tmp_path: Path) -> None:
     proc_html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(encoding="utf-8")
     bad_url = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/" "overview.html"
