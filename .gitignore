@@ -133,4 +133,8 @@ dmypy.json
 # vscode settings
 .vscode/
 
-src/_your_package_version.py
+src/bnetza_bk6_scraper/_version.py
+
+# local smoke-test output
+_smoke/
+_smoke*/
