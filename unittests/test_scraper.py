@@ -96,6 +96,62 @@ async def test_mirror_continues_when_one_pdf_fails(tmp_path: Path) -> None:
     assert not (folder / "BK6-23-241_y.pdf").exists()
 
 
+def _synthetic_proceeding_page(az: str) -> str:
+    """A minimal proceeding page with #content, an <h2> title and one .pdf link."""
+    pdf = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        f"{az}/{az}_dok.pdf"
+    )
+    return (
+        "<html><head><base href='/'/></head><body><div id='content'>"
+        f"<h2>Titel {az}</h2>"
+        f"<a href='{pdf}'>Dokument</a>"
+        "</div></body></html>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_mirror_processes_multiple_proceedings(tmp_path: Path) -> None:
+    az_one = "BK6-23-001"
+    az_two = "BK6-23-002"
+    proc_one_url = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        f"{az_one}/{az_one}_konsultation.html"
+    )
+    proc_two_url = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        f"{az_two}/{az_two}_konsultation.html"
+    )
+    pdf_one = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        f"{az_one}/{az_one}_dok.pdf"
+    )
+    pdf_two = (
+        "https://www.bundesnetzagentur.de/DE/Beschlusskammern/1_GZ/BK6-GZ/2023/"
+        f"{az_two}/{az_two}_dok.pdf"
+    )
+    lv_html = (
+        f'<html><body><a href="{proc_one_url}">{az_one}</a>'
+        f'<a href="{proc_two_url}">{az_two}</a></body></html>'
+    )
+    with aioresponses() as mocked:
+        mocked.get(LV, status=200, body=lv_html)
+        mocked.get(AV, status=200, body="<html><body></body></html>")
+        mocked.get(proc_one_url, status=200, body=_synthetic_proceeding_page(az_one))
+        mocked.get(proc_two_url, status=200, body=_synthetic_proceeding_page(az_two))
+        mocked.get(pdf_one, status=200, body=b"%PDF-1.7 one")
+        mocked.get(pdf_two, status=200, body=b"%PDF-1.7 two")
+        scraper = BnetzaBk6Scraper()
+        proceedings = await scraper.mirror(tmp_path)
+
+    assert {p.aktenzeichen for p in proceedings} == {az_one, az_two}
+    for az in (az_one, az_two):
+        assert (tmp_path / "2023" / az / "metadata.json").exists()
+    index = json.loads((tmp_path / "index.json").read_text(encoding="utf-8"))
+    listed = {entry["aktenzeichen"] for entry in index}
+    assert {az_one, az_two} <= listed
+
+
 @pytest.mark.asyncio
 async def test_mirror_skips_index_link_without_aktenzeichen(tmp_path: Path) -> None:
     proc_html = (FIXTURES / "proceeding_BK6-23-241_konsultation.html").read_text(

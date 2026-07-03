@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections import defaultdict
@@ -45,22 +46,25 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
                     continue
                 by_az[aktenzeichen].append(url)
 
-            attempted = 0
-            for aktenzeichen, page_urls in by_az.items():
-                if year is not None and not aktenzeichen.startswith(
-                    f"BK6-{year % 100:02d}-"
-                ):
-                    continue
-                attempted += 1
-                try:
-                    proceeding = await self._mirror_proceeding(
+            selected: list[tuple[str, list[str]]] = [
+                (aktenzeichen, page_urls)
+                for aktenzeichen, page_urls in by_az.items()
+                if year is None
+                or aktenzeichen.startswith(f"BK6-{year % 100:02d}-")
+            ]
+            attempted = len(selected)
+
+            # Run the selected proceedings concurrently; the Fetcher's semaphore
+            # bounds the actual HTTP concurrency, so --concurrency takes effect.
+            results = await asyncio.gather(
+                *(
+                    self._safe_mirror_proceeding(
                         fetcher, aktenzeichen, page_urls, target
                     )
-                    proceedings.append(proceeding)
-                except Exception:  # pylint: disable=broad-except
-                    _logger.warning(
-                        "failed to mirror %s", aktenzeichen, exc_info=True
-                    )
+                    for aktenzeichen, page_urls in selected
+                )
+            )
+            proceedings = [p for p in results if p is not None]
 
         self._write_index(target, proceedings)
         doc_count = sum(len(p.documents) for p in proceedings)
@@ -72,6 +76,22 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             failures,
         )
         return proceedings
+
+    async def _safe_mirror_proceeding(
+        self,
+        fetcher: Fetcher,
+        aktenzeichen: str,
+        page_urls: list[str],
+        target: Path,
+    ) -> Proceeding | None:
+        """Mirror one proceeding, logging and swallowing failures so the run continues."""
+        try:
+            return await self._mirror_proceeding(
+                fetcher, aktenzeichen, page_urls, target
+            )
+        except Exception:  # pylint: disable=broad-except
+            _logger.warning("failed to mirror %s", aktenzeichen, exc_info=True)
+            return None
 
     async def _mirror_proceeding(
         self,
