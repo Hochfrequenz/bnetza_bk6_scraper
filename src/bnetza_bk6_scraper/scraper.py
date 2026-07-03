@@ -16,6 +16,7 @@ from bnetza_bk6_scraper.parse import (
     aktenzeichen_from_url,
     parse_proceeding_page,
     phase_from_url,
+    year_from_aktenzeichen,
 )
 
 _logger = logging.getLogger(__name__)
@@ -27,28 +28,20 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
     def __init__(self, concurrency: int = 4) -> None:
         self._concurrency = concurrency
 
-    async def mirror(self, target_dir: str | Path, year: int | None = None) -> list[Proceeding]:
-        """Download all (or one year's) BK6 proceedings into target_dir."""
+    async def mirror(
+        self, target_dir: str | Path, year: int | None = None, min_year: int | None = None
+    ) -> list[Proceeding]:
+        """Download BK6 proceedings into target_dir.
+
+        ``year`` restricts to a single year; ``min_year`` skips proceedings older than that
+        year (filtered during discovery, so old proceedings are never downloaded).
+        """
         target = Path(target_dir)
         target.mkdir(parents=True, exist_ok=True)
         proceedings: list[Proceeding] = []
 
         async with Fetcher(concurrency=self._concurrency) as fetcher:
-            urls = await discover_proceeding_urls(fetcher)
-            by_az: dict[str, list[str]] = defaultdict(list)
-            for url in urls:
-                try:
-                    aktenzeichen = aktenzeichen_from_url(url)
-                except ValueError:
-                    _logger.warning("skipping URL without Aktenzeichen: %s", url)
-                    continue
-                by_az[aktenzeichen].append(url)
-
-            selected: list[tuple[str, list[str]]] = [
-                (aktenzeichen, page_urls)
-                for aktenzeichen, page_urls in by_az.items()
-                if year is None or aktenzeichen.startswith(f"BK6-{year % 100:02d}-")
-            ]
+            selected = self._select_proceedings(await discover_proceeding_urls(fetcher), year, min_year)
             attempted = len(selected)
 
             # Run the selected proceedings concurrently; the Fetcher's semaphore
@@ -71,6 +64,24 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             failures,
         )
         return proceedings
+
+    @staticmethod
+    def _select_proceedings(urls: list[str], year: int | None, min_year: int | None) -> list[tuple[str, list[str]]]:
+        """Group discovered URLs by Aktenzeichen and apply the year / min_year filters."""
+        by_az: dict[str, list[str]] = defaultdict(list)
+        for url in urls:
+            try:
+                aktenzeichen = aktenzeichen_from_url(url)
+            except ValueError:
+                _logger.warning("skipping URL without Aktenzeichen: %s", url)
+                continue
+            by_az[aktenzeichen].append(url)
+        return [
+            (aktenzeichen, page_urls)
+            for aktenzeichen, page_urls in by_az.items()
+            if (year is None or aktenzeichen.startswith(f"BK6-{year % 100:02d}-"))
+            and (min_year is None or year_from_aktenzeichen(aktenzeichen) >= min_year)
+        ]
 
     async def _safe_mirror_proceeding(
         self,
