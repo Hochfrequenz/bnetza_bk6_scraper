@@ -22,19 +22,21 @@ def _attr_str(tag: Tag, name: str) -> str | None:
 
 
 def aktenzeichen_from_url(url: str) -> str:
-    """Extract the Aktenzeichen (e.g. 'BK6-23-241') from a proceeding URL.
+    """Extract the proceeding's Aktenzeichen (e.g. 'BK6-23-241') from a BK6 URL.
 
-    A BK6 URL normally contains the Aktenzeichen more than once (the directory *and* the
-    filename, e.g. ``.../BK6-23-241/BK6-23-241_konsultation.html``). We don't assume a single
-    occurrence: all occurrences must agree. If they don't, the URL is ambiguous and we raise
-    rather than silently picking the first.
+    A BK6 document lives under a proceeding *directory* named by its Aktenzeichen, e.g.
+    ``.../BK6-GZ/2023/BK6-23-241/BK6-23-241_konsultation.html``. The document *filename* may
+    legitimately reference a *different* (sub-, amended or related) Aktenzeichen, e.g.
+    ``.../2019/BK6-19-601/BK6-15-045_Ae_Beschluss.html`` or
+    ``.../2018/BK6-18-004/BK6-18-006-F6_beschluss...html``. We therefore key on the
+    **directory** — the first path segment that carries an Aktenzeichen — not the filename,
+    so such documents are grouped under their proceeding instead of being dropped.
     """
-    found = {match.group("aktenzeichen") for match in _AKTENZEICHEN_RE.finditer(url)}
-    if not found:
-        raise ValueError(f"no Aktenzeichen found in URL: {url}")
-    if len(found) > 1:
-        raise ValueError(f"conflicting Aktenzeichen {sorted(found)} in URL: {url}")
-    return found.pop()
+    for segment in urlsplit(url).path.split("/"):
+        match = _AKTENZEICHEN_RE.search(segment)
+        if match:
+            return match.group("aktenzeichen")
+    raise ValueError(f"no Aktenzeichen found in URL: {url}")
 
 
 def year_from_aktenzeichen(aktenzeichen: str) -> int:
