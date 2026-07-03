@@ -120,6 +120,10 @@ def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
     status = phase.replace("_", " ").capitalize() or None
 
     deadline = None
+    # Only trust a date that sits close after a "Frist"/"Stellungnahme" label. The {0,60}
+    # window (a heuristic, ~one clause of German prose, non-greedy) keeps us on the date that
+    # belongs to the label and avoids latching onto an unrelated date elsewhere in the text;
+    # it is deliberately generous enough to span short wording like "Frist zur Stellungnahme: ".
     label = content.find(string=re.compile(r"(Frist|Stellungnahme).{0,60}?\d{2}\.\d{2}\.\d{4}"))
     if label:
         deadline = _parse_german_date(str(label))
