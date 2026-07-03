@@ -19,7 +19,9 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "aiohttp",
+    # aiohttp>=3.14 removed a positional arg from ClientResponse that aioresponses 0.7.9
+    # (latest) still relies on, breaking the test suite. Cap until aioresponses catches up.
+    "aiohttp<3.14",
     "beautifulsoup4",
     "lxml",
     "typer",
