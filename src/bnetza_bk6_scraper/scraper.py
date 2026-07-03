@@ -1,0 +1,125 @@
+"""Orchestrates discovery, download, and writing of the BK6 mirror."""
+
+from __future__ import annotations
+
+import json
+import logging
+from collections import defaultdict
+from pathlib import Path
+
+from bnetza_bk6_scraper.discovery import discover_proceeding_urls
+from bnetza_bk6_scraper.fetch import Fetcher
+from bnetza_bk6_scraper.models import Proceeding, ProceedingPage
+from bnetza_bk6_scraper.normalize import normalize_html
+from bnetza_bk6_scraper.parse import (
+    aktenzeichen_from_url,
+    parse_proceeding_page,
+    phase_from_url,
+)
+
+_logger = logging.getLogger(__name__)
+
+
+class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
+    """Mirrors BK6 proceedings into a structured directory tree."""
+
+    def __init__(self, concurrency: int = 4) -> None:
+        self._concurrency = concurrency
+
+    async def mirror(
+        self, target_dir: str | Path, year: int | None = None
+    ) -> list[Proceeding]:
+        """Download all (or one year's) BK6 proceedings into target_dir."""
+        target = Path(target_dir)
+        target.mkdir(parents=True, exist_ok=True)
+        proceedings: list[Proceeding] = []
+
+        async with Fetcher(concurrency=self._concurrency) as fetcher:
+            urls = await discover_proceeding_urls(fetcher)
+            by_az: dict[str, list[str]] = defaultdict(list)
+            for url in urls:
+                by_az[aktenzeichen_from_url(url)].append(url)
+
+            for aktenzeichen, page_urls in by_az.items():
+                if year is not None and not aktenzeichen.startswith(
+                    f"BK6-{year % 100:02d}-"
+                ):
+                    continue
+                try:
+                    proceeding = await self._mirror_proceeding(
+                        fetcher, aktenzeichen, page_urls, target
+                    )
+                    proceedings.append(proceeding)
+                except Exception:  # pylint: disable=broad-except
+                    _logger.warning(
+                        "failed to mirror %s", aktenzeichen, exc_info=True
+                    )
+
+        self._write_index(target, proceedings)
+        doc_count = sum(len(p.documents) for p in proceedings)
+        failures = len(by_az) - len(proceedings)
+        _logger.info(
+            "run summary: %d proceedings, %d documents written, %d failures",
+            len(proceedings),
+            doc_count,
+            failures,
+        )
+        return proceedings
+
+    async def _mirror_proceeding(
+        self,
+        fetcher: Fetcher,
+        aktenzeichen: str,
+        page_urls: list[str],
+        target: Path,
+    ) -> Proceeding:
+        """Fetch, parse, and persist all phase pages and documents of one proceeding."""
+        merged: Proceeding | None = None
+        pages: list[ProceedingPage] = []
+        for url in page_urls:
+            html = await fetcher.get_text(url)
+            parsed = parse_proceeding_page(html, source_url=url)
+            phase = phase_from_url(url)
+            pages.append(ProceedingPage(phase=phase, source_url=url))
+            folder = target / str(parsed.year) / aktenzeichen
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / f"{aktenzeichen}_{phase}.html").write_text(
+                normalize_html(html), encoding="utf-8"
+            )
+            if merged is None:
+                merged = parsed
+            else:
+                seen = {d.filename for d in merged.documents}
+                merged.documents += [
+                    d for d in parsed.documents if d.filename not in seen
+                ]
+        assert merged is not None
+        merged.pages = pages
+
+        folder = target / str(merged.year) / aktenzeichen
+        for doc in merged.documents:
+            data = await fetcher.get_bytes(doc.source_url)
+            (folder / doc.filename).write_bytes(data)
+        (folder / "metadata.json").write_text(
+            json.dumps(merged.model_dump(mode="json"), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return merged
+
+    @staticmethod
+    def _write_index(target: Path, proceedings: list[Proceeding]) -> None:
+        """Write the top-level index.json summarizing all mirrored proceedings."""
+        index = [
+            {
+                "aktenzeichen": p.aktenzeichen,
+                "year": p.year,
+                "title": p.title,
+                "status": p.status,
+                "stand": p.stand.isoformat() if p.stand else None,
+                "path": f"{p.year}/{p.aktenzeichen}",
+            }
+            for p in sorted(proceedings, key=lambda p: p.aktenzeichen)
+        ]
+        (target / "index.json").write_text(
+            json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
