@@ -134,8 +134,10 @@ async def mirror_seeds(
 ) -> list[CandidateDocument]:
 ```
 
+- `keep` is a **required** argument (no default) so a caller can never silently mirror
+  nothing or everything by omission.
 - Crawl → for each `CandidateDocument`, keep it iff **any** predicate in `keep` returns
-  `True` (empty `keep` ⇒ keep nothing; explicit and safe).
+  `True` (empty `keep` list ⇒ keep nothing; explicit and safe).
 - Download kept docs and write them (layout below). Failures are logged and swallowed per
   document, matching the existing run-continues behavior. Emits the same style of run-summary
   log line.
@@ -168,7 +170,7 @@ Not part of this repo's PR, documented for context:
 - Add `download_and_post_process.py` that:
   - defines `SEEDS` = the GPKE / WiM / MaBiS / MaKo2022 topic-page URLs + the PID source page,
   - defines the predicates below,
-  - calls `BnetzaBk6Scraper(...).mirror_seeds(target=".", seeds=SEEDS, keep=[...])`.
+  - calls `BnetzaBk6Scraper(...).mirror_seeds(target_dir=".", seeds=SEEDS, keep=[...])`.
 - Point `mirror.yml` at the script instead of `bnetza-bk6-scraper mirror --target .`.
 
 Example predicates (policy lives here, not in the package):
@@ -223,4 +225,8 @@ def is_pid_liste(c: CandidateDocument) -> bool:
    script should **seed the specific page/section that links the current PID** and keep
    `max_depth` shallow, rather than crawling all Mitteilungen. Exact seed URL to be pinned in
    the mirror-repo follow-up.
+3. **Default `url_prefixes` granularity.** When `url_prefixes` is `None`, derive from each
+   seed's own directory (e.g. `…/831_gpke/`) rather than the whole `…/BK06/` subtree, so a
+   depth-1 crawl stays local to the seeded topic and does not wander the entire chamber. To
+   be confirmed in the plan.
 ```
