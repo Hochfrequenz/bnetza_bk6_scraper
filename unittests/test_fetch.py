@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from aioresponses import aioresponses
 from bnetza_bk6_scraper.fetch import _HEADERS, Fetcher
@@ -43,6 +45,28 @@ async def test_fetch_retries_on_waf_block_page() -> None:
         async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
             body = await fetcher.get_text(url)
     assert body == "real content"
+
+
+@pytest.mark.asyncio
+async def test_get_bytes_retries_on_waf_block_page() -> None:
+    url = "https://www.bundesnetzagentur.de/blocked.pdf"
+    with aioresponses() as mocked:
+        mocked.get(url, status=200, body=b"... The requested URL was rejected ...")
+        mocked.get(url, status=200, body=b"%PDF-1.7")
+        async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
+            data = await fetcher.get_bytes(url)
+    assert data.startswith(b"%PDF")
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_on_timeout() -> None:
+    url = "https://www.bundesnetzagentur.de/slow.html"
+    with aioresponses() as mocked:
+        mocked.get(url, exception=asyncio.TimeoutError())
+        mocked.get(url, status=200, body="ok")
+        async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
+            body = await fetcher.get_text(url)
+    assert body == "ok"
 
 
 def test_browser_user_agent_configured() -> None:

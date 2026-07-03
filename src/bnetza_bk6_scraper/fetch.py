@@ -18,6 +18,8 @@ _HEADERS = {
 }
 _TRANSIENT = {429, 500, 502, 503, 504}
 _WAF_BLOCK_MARKER = "The requested URL was rejected"
+# aiohttp's default total timeout is 5 minutes; cap it so a stuck request retries.
+_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
 class WafBlockedError(aiohttp.ClientError):
@@ -36,7 +38,7 @@ class Fetcher:
         self._session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "Fetcher":
-        self._session = aiohttp.ClientSession(headers=_HEADERS)
+        self._session = aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -62,8 +64,11 @@ class Fetcher:
                             if _WAF_BLOCK_MARKER in text:
                                 raise WafBlockedError(url)
                             return text
-                        return await resp.read()
-                except aiohttp.ClientError as exc:
+                        data = await resp.read()
+                        if _WAF_BLOCK_MARKER.encode() in data:
+                            raise WafBlockedError(url)
+                        return data
+                except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                     last_exc = exc
             if attempt < self._max_retries:
                 await asyncio.sleep(self._backoff * (attempt + 1))

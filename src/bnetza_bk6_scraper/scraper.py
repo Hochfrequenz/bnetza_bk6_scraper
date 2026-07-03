@@ -38,7 +38,12 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
             urls = await discover_proceeding_urls(fetcher)
             by_az: dict[str, list[str]] = defaultdict(list)
             for url in urls:
-                by_az[aktenzeichen_from_url(url)].append(url)
+                try:
+                    aktenzeichen = aktenzeichen_from_url(url)
+                except ValueError:
+                    _logger.warning("skipping URL without Aktenzeichen: %s", url)
+                    continue
+                by_az[aktenzeichen].append(url)
 
             attempted = 0
             for aktenzeichen, page_urls in by_az.items():
@@ -100,8 +105,14 @@ class BnetzaBk6Scraper:  # pylint: disable=too-few-public-methods
 
         folder = target / str(merged.year) / aktenzeichen
         for doc in merged.documents:
-            data = await fetcher.get_bytes(doc.source_url)
-            (folder / doc.filename).write_bytes(data)
+            try:
+                data = await fetcher.get_bytes(doc.source_url)
+                (folder / doc.filename).write_bytes(data)
+            except Exception:  # pylint: disable=broad-except
+                _logger.warning(
+                    "failed to download %s", doc.source_url, exc_info=True
+                )
+                continue
         (folder / "metadata.json").write_text(
             json.dumps(merged.model_dump(mode="json"), indent=2, ensure_ascii=False),
             encoding="utf-8",
