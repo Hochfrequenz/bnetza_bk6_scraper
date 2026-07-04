@@ -117,15 +117,11 @@ class BnetzaBk6Scraper:
         ) as fetcher:
             candidates = await crawl_candidates(fetcher, seeds, max_depth, url_prefixes)
             kept = [c for c in candidates if any(pred(c) for pred in keep)]
-            for cand in kept:
-                dest = target / _relative_path_for(cand)
-                try:
-                    data = await fetcher.get_bytes(cand.source_url)
-                except Exception:  # pylint: disable=broad-except
-                    _logger.warning("failed to download %s", cand.source_url, exc_info=True)
-                    continue
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(data)
+            # Download concurrently; the Fetcher's semaphore bounds the actual HTTP
+            # concurrency, mirroring the fan-out the full-index mirror() path uses.
+            await asyncio.gather(
+                *(self._safe_download_candidate(fetcher, cand, target) for cand in kept)
+            )
 
         self._write_manifest(target, kept)
         _logger.info(
@@ -135,6 +131,21 @@ class BnetzaBk6Scraper:
             len(seeds),
         )
         return kept
+
+    @staticmethod
+    async def _safe_download_candidate(
+        fetcher: Fetcher, candidate: CandidateDocument, target: Path
+    ) -> None:
+        """Download one kept candidate and write it, logging and swallowing failures so the
+        run continues (matches the per-document behavior of the full-index mirror)."""
+        dest = target / _relative_path_for(candidate)
+        try:
+            data = await fetcher.get_bytes(candidate.source_url)
+        except Exception:  # pylint: disable=broad-except
+            _logger.warning("failed to download %s", candidate.source_url, exc_info=True)
+            return
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
 
     @staticmethod
     def _write_manifest(target: Path, kept: list[CandidateDocument]) -> None:
