@@ -28,6 +28,32 @@ class Document(BaseModel):
     """Bare filename written into the mirror, e.g. ``"BK6-23-241_konsultationsdokument.pdf"``."""
 
 
+class CandidateDocument(BaseModel):
+    """A downloadable document discovered while crawling seed pages, before any predicate
+    has decided whether to keep it. Carries enough context for a predicate to decide
+    without fetching the file first."""
+
+    source_url: str
+    """Absolute URL of the linked file (may carry a ``?__blob=publicationFile&v=…`` query)."""
+
+    filename: str
+    """Bare filename, e.g. ``"BK6-24-174_GPKE_Teil1_Lesefassung.pdf"``."""
+
+    title: str
+    """Anchor link text (falls back to the filename when the anchor has no text)."""
+
+    found_on: str
+    """URL of the page this link was discovered on — gives topic/framework context."""
+
+    aktenzeichen: str | None = None
+    """Proceeding Aktenzeichen parsed from the URL path, or ``None`` (e.g. PID docs in the
+    Datenformate tree carry no Aktenzeichen)."""
+
+    doc_type: str | None = None
+    """Document-type slug parsed from the filename after the Aktenzeichen prefix, or ``None``
+    when the URL carries no Aktenzeichen."""
+
+
 class ProceedingPage(BaseModel):
     """One phase page (e.g. konsultation, festlegungsverfahren) of a proceeding."""
 
