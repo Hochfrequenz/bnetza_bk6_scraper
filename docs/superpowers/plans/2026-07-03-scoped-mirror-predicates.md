@@ -10,9 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-03-scoped-mirror-predicates-design.md`
 
-**Status (2026-07-03):** Brainstorm ✅, spec ✅ (reviewed), plan ✅ (reviewed). **Not yet
-implemented** — Tasks 1–8 below are unstarted. Resume with the subagent-driven-development
-skill, one task at a time, checking the boxes as you go.
+**Status (2026-07-04):** Brainstorm ✅, spec ✅ (reviewed), plan ✅ (reviewed). **Tasks 1–7
+implemented** — scraper package changes landed on `feat/scoped-mirror-predicates` with the full
+`tox` gate green (43 tests, pylint 10/10, mypy `--strict`, coverage 99%) and a code-review pass
+applied (concurrent downloads in `mirror_seeds`). **Task 8 (release + mirror-repo cleanup)
+remains** — it runs after this PR merges and touches the separate `bnetza_bk6_mirror` repo.
 
 ## Environment note
 
