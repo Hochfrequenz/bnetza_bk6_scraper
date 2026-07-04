@@ -833,7 +833,33 @@ git commit -m "chore: satisfy lint/type/spell/coverage for scoped mirroring"
 ### Task 8: Release + mirror-repo cleanup (per user instruction — separate repo)
 
 > This runs **after** the scraper PR is merged and the review is complete. It touches the
-> **`Hochfrequenz/bnetza_bk6_mirror`** repo at `C:\github\bnetza_bk6_mirror`, not this one.
+> **`Hochfrequenz/bnetza_bk6_mirror`** repo (cloned at `~/bnetza_bk6_mirror` on this machine),
+> not this one.
+
+**Scope resolved + validated against the live site (2026-07-04, `max_depth=0`).** A dry run of
+`crawl_candidates` against the pinned seeds below yields exactly the intended **8 documents**
+(GPKE Teil 1–4, WiM Teil 1–2, MaBiS, current PID) and nothing else. Pinned seeds — note WiM
+has its **own** node (`834_wim`), MaBiS is `833_mabis` (not the MaBiS-Hub), GPKE Teil 4 and
+Teil 1–3 are all direct links on the GPKE node, and the **current** PID is the single published
+PDF on the newest `Mitteilung_NN` page (not the Datenformate node, which fans out to ~1000 docs
+and every historical PID version):
+
+```
+https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/831_gpke/gpke_node.html
+https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/834_wim/BK6_WiM_node_neu.html
+https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/833_mabis/mabis_node.html
+https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/835_mitteilungen_datenformate/Mitteilung_56/Mitteilung_Nr_56.html
+```
+
+Refined predicates (policy in the driver): keep GPKE/WiM/MaBiS files excluding
+`aenderung`/`änderung`/`konsultation` (this includes GPKE Teil 4 `Anlage1d_GPKE_Teil4.pdf`,
+which has no `lesefassung` in its name), and keep the current PID (`startswith("pid_")` and
+`"konsultationsfassung" not in name`). **PID is "current published only":** seed the newest
+`Mitteilung_NN` at `max_depth=0`; when BNetzA publishes a new PID the driver's `Mitteilung_NN`
+seed must be bumped (a new Mitteilung == a new PID release, a few times/year).
+
+Related scraper fix already landed on this branch: `fetch.get_text` now falls back to cp1252
+when a page body is not valid UTF-8, so non-UTF-8 topic pages are no longer silently dropped.
 
 - [ ] **Step 1: Cut the release (version bump).** Version is hatch-vcs from git tags, so bumping
   = tagging a release. After the scraper PR merges to `main`:
@@ -841,10 +867,10 @@ git commit -m "chore: satisfy lint/type/spell/coverage for scoped mirroring"
   API). This triggers `python-publish.yml` → PyPI. Confirm the publish succeeded.
 
 - [ ] **Step 2: Add the driver script** `download_and_post_process.py` to the mirror repo
-  (edi_energy_mirror pattern): define `SEEDS` (GPKE / WiM / MaBiS / MaKo2022 topic pages + the
-  current PID source page) and the predicates (`is_prozessdokument_lesefassung`, `is_pid_liste`),
-  and call `BnetzaBk6Scraper().mirror_seeds(target_dir=".", seeds=SEEDS, keep=[...])`. Pin the
-  scraper to `>=0.1.0` in `dependencies/mirror-requirements.txt`.
+  (edi_energy_mirror pattern) with the pinned `SEEDS` + refined predicates above (use standard
+  `logging` to stdout, not `print`), calling
+  `BnetzaBk6Scraper().mirror_seeds(target_dir=".", seeds=SEEDS, keep=[...], max_depth=0)`. Pin
+  the scraper to `>=0.1.0` in `dependencies/mirror-requirements.txt`.
 
 - [ ] **Step 3: Point `mirror.yml`** at `python download_and_post_process.py` instead of
   `bnetza-bk6-scraper mirror --target .`.
@@ -854,8 +880,13 @@ git commit -m "chore: satisfy lint/type/spell/coverage for scoped mirroring"
   subset, remove the out-of-scope content so the tree reflects only what the driver produces.
   Recommended: in a branch, `git rm -r` the old top-level year directories + `index.json`, run
   the new driver locally to regenerate the scoped tree + `manifest.json`, commit, and open a
-  cleanup PR. **Confirm the exact deletion set with the user before force-cleaning** — this is
-  a destructive, outward-facing change to a published data repo.
+  cleanup PR. **User authorized the destructive cleanup (2026-07-04)** — proceed via a PR (not a
+  direct push to `main`) once the driver's scoped output is confirmed and v0.1.0 is released.
+  > **Side note (why the full mirror is worth retiring):** the existing `mirror --target .` run
+  > is non-deterministic. Runs #2 and #3 mirrored 257 vs 74 proceedings with **zero overlap** —
+  > each run silently drops a different subset because `_safe_mirror_proceeding` swallows
+  > per-proceeding transient WAF/timeout/5xx failures, so every PR is noisy. The scoped driver
+  > (~5 pages + 8 docs) is effectively immune, which is a further reason to migrate + clean.
 
 - [ ] **Step 5:** Verify the mirror Action runs green on the new script and opens/auto-merges its
   PR as before.
