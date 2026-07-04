@@ -70,5 +70,22 @@ async def test_fetch_retries_on_timeout() -> None:
     assert body == "ok"
 
 
+@pytest.mark.asyncio
+async def test_fetch_text_falls_back_when_body_is_not_utf8() -> None:
+    # BNetzA serves some pages as declared-utf-8 but actually Windows-1252; 0xfc is "ü" in
+    # cp1252 and an invalid utf-8 start byte, so resp.text() raises UnicodeDecodeError.
+    url = "https://www.bundesnetzagentur.de/latin1.html"
+    with aioresponses() as mocked:
+        mocked.get(
+            url,
+            status=200,
+            body=b"\xfcber",
+            headers={"Content-Type": "text/html; charset=utf-8"},
+        )
+        async with Fetcher() as fetcher:
+            body = await fetcher.get_text(url)
+    assert body == "über"  # decoded via the cp1252 fallback instead of being dropped
+
+
 def test_browser_user_agent_configured() -> None:
     assert "Mozilla/5.0" in _HEADERS["User-Agent"]

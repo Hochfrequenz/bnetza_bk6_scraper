@@ -56,7 +56,14 @@ class Fetcher:
                             raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
                         resp.raise_for_status()
                         if as_text:
-                            text = await resp.text()
+                            try:
+                                text = await resp.text()
+                            except UnicodeDecodeError:
+                                # Some BNetzA pages serve/declare a charset aiohttp mis-detects
+                                # (non-UTF-8, often Windows-1252 for German content). Fall back
+                                # to cp1252 with replacement so the crawl continues instead of
+                                # silently dropping the page.
+                                text = (await resp.read()).decode("cp1252", errors="replace")
                             if _WAF_BLOCK_MARKER in text:
                                 raise WafBlockedError(url)
                             return text

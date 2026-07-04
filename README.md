@@ -49,6 +49,34 @@ bnetza-bk6-scraper mirror --target ./mirror --year 2023 -v
 Each run logs a summary such as
 `run summary: 7 proceedings, 16 documents written, 0 failures`.
 
+## Scoped mirroring (Python API)
+
+The `mirror` CLI mirrors *all* proceedings. To mirror only a curated subset (e.g. the
+electricity GPKE/WiM/MaBiS Prozessdokumente), use the Python API: give the scraper a list of
+**seed pages** to crawl and a list of **predicates** (OR semantics — a document is downloaded
+if *any* predicate returns `True`). Predicates receive a `CandidateDocument`.
+
+```python
+import asyncio
+from bnetza_bk6_scraper import BnetzaBk6Scraper, CandidateDocument
+
+GPKE = "https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/831_gpke/gpke_node.html"
+
+def is_prozessdokument_lesefassung(c: CandidateDocument) -> bool:
+    name = c.filename.lower()
+    return any(fw in name for fw in ("_gpke_", "_wim_", "_mabis_")) and "lesefassung" in name
+
+asyncio.run(
+    BnetzaBk6Scraper().mirror_seeds(
+        target_dir=".", seeds=[GPKE], keep=[is_prozessdokument_lesefassung]
+    )
+)
+```
+
+Documents that carry an Aktenzeichen are written under `<year>/<aktenzeichen>/`; documents
+without one (e.g. the PID-Liste in the Datenformate tree) go under `_other/…`. A root
+`manifest.json` lists the kept documents.
+
 ## Output layout
 
 Proceedings are written under `/{year}/{aktenzeichen}/`, with a top-level
