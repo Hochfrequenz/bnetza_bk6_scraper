@@ -44,9 +44,7 @@ def _relative_path_for(candidate: CandidateDocument) -> Path:
 class BnetzaBk6Scraper:
     """Mirrors BK6 proceedings into a structured directory tree."""
 
-    def __init__(
-        self, concurrency: int = 4, max_retries: int = 3, backoff_seconds: float = 1.0
-    ) -> None:
+    def __init__(self, concurrency: int = 4, max_retries: int = 3, backoff_seconds: float = 1.0) -> None:
         self._concurrency = concurrency
         self._max_retries = max_retries
         self._backoff_seconds = backoff_seconds
@@ -119,9 +117,7 @@ class BnetzaBk6Scraper:
             kept = [c for c in candidates if any(pred(c) for pred in keep)]
             # Download concurrently; the Fetcher's semaphore bounds the actual HTTP
             # concurrency, mirroring the fan-out the full-index mirror() path uses.
-            await asyncio.gather(
-                *(self._safe_download_candidate(fetcher, cand, target) for cand in kept)
-            )
+            await asyncio.gather(*(self._safe_download_candidate(fetcher, cand, target) for cand in kept))
 
         self._write_manifest(target, kept)
         _logger.info(
@@ -133,9 +129,7 @@ class BnetzaBk6Scraper:
         return kept
 
     @staticmethod
-    async def _safe_download_candidate(
-        fetcher: Fetcher, candidate: CandidateDocument, target: Path
-    ) -> None:
+    async def _safe_download_candidate(fetcher: Fetcher, candidate: CandidateDocument, target: Path) -> None:
         """Download one kept candidate and write it, logging and swallowing failures so the
         run continues (matches the per-document behavior of the full-index mirror)."""
         dest = target / _relative_path_for(candidate)
@@ -162,9 +156,7 @@ class BnetzaBk6Scraper:
             }
             for c in sorted(kept, key=lambda c: str(_relative_path_for(c)))
         ]
-        (target / "manifest.json").write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        (target / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
     @staticmethod
     def _select_proceedings(urls: list[str], year: int | None, min_year: int | None) -> list[tuple[str, list[str]]]:

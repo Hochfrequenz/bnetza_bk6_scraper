@@ -41,10 +41,6 @@ def test_parse_followable_links_returns_absolute_html_links() -> None:
 
 
 def test_parse_followable_links_deduplicates() -> None:
-    html = (
-        "<html><body>"
-        "<a href='/a/x.html'>x</a><a href='/a/x.html'>x again</a>"
-        "</body></html>"
-    )
+    html = "<html><body>" "<a href='/a/x.html'>x</a><a href='/a/x.html'>x again</a>" "</body></html>"
     links = parse_followable_links(html, page_url=f"{BASE}/a/index.html")
     assert links.count(f"{BASE}/a/x.html") == 1
