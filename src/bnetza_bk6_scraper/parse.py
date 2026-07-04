@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
-from bnetza_bk6_scraper.models import Document, Proceeding
+from bnetza_bk6_scraper.models import CandidateDocument, Document, Proceeding
 
 # Named components make the shape self-documenting and let callers pull out the
 # two-digit year without re-splitting the string: BK6-<yy>-<sequence>, e.g. BK6-23-241.
@@ -101,6 +101,59 @@ def _parse_documents(content: Tag, base: str, aktenzeichen: str) -> list[Documen
             )
         )
     return documents
+
+
+def parse_candidate_documents(html: str, page_url: str) -> list[CandidateDocument]:
+    """Extract every PDF link on a page as a CandidateDocument, with source context.
+
+    Unlike :func:`_parse_documents`, this works on any page (topic pages, notice pages),
+    so the Aktenzeichen may be absent — in which case ``aktenzeichen``/``doc_type`` are None.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    base = _effective_base(soup, page_url)
+    candidates: list[CandidateDocument] = []
+    seen: set[str] = set()
+    for anchor in soup.select('a[href*=".pdf"]'):
+        href_attr = _attr_str(anchor, "href")
+        if href_attr is None:
+            continue
+        href = urljoin(base, href_attr)
+        if href in seen:
+            continue
+        seen.add(href)
+        filename = filename_from_pdf_url(href)
+        try:
+            aktenzeichen: str | None = aktenzeichen_from_url(href)
+        except ValueError:
+            aktenzeichen = None
+        doc_type = _doc_type_from_filename(filename, aktenzeichen) if aktenzeichen else None
+        candidates.append(
+            CandidateDocument(
+                source_url=href,
+                filename=filename,
+                title=anchor.get_text(strip=True) or filename,
+                found_on=page_url,
+                aktenzeichen=aktenzeichen,
+                doc_type=doc_type,
+            )
+        )
+    return candidates
+
+
+def parse_followable_links(html: str, page_url: str) -> list[str]:
+    """Return de-duplicated absolute URLs of non-PDF HTML anchors on the page.
+
+    Used by the bounded crawler to enqueue sub-pages. PDF links are excluded (they are
+    handled by :func:`parse_candidate_documents`)."""
+    soup = BeautifulSoup(html, "lxml")
+    base = _effective_base(soup, page_url)
+    links: list[str] = []
+    for anchor in soup.select("a[href]"):
+        href = _attr_str(anchor, "href")
+        if not href or ".pdf" in href.lower():
+            continue
+        links.append(urljoin(base, href))
+    return list(dict.fromkeys(links))
 
 
 def parse_proceeding_page(html: str, source_url: str) -> Proceeding:
