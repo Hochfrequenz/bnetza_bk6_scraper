@@ -14,6 +14,19 @@ from bnetza_bk6_scraper.models import CandidateDocument, Document, Proceeding
 # two-digit year without re-splitting the string: BK6-<yy>-<sequence>, e.g. BK6-23-241.
 _AKTENZEICHEN_RE = re.compile(r"(?P<aktenzeichen>BK6-(?P<yy>\d{2})-(?P<sequence>\d{2,4}))")
 
+# Downloadable document types we mirror. BNetzA publishes some artefacts — notably the
+# Liste der Prüfidentifikatoren (PID) — as both a PDF and a machine-friendly Excel file;
+# the Excel is far nicer to work with, so link detection keys on this set, not PDFs alone.
+_DOCUMENT_EXTENSIONS = (".pdf", ".xlsx", ".xls")
+
+
+def _is_document_href(href: str) -> bool:
+    """True if ``href`` points at a downloadable document (by URL-path extension).
+
+    Keys on the URL *path* so a trailing ``?__blob=publicationFile&v=1`` query (which BNetzA
+    appends to its download links) does not hide the extension."""
+    return urlsplit(href).path.lower().endswith(_DOCUMENT_EXTENSIONS)
+
 
 def _attr_str(tag: Tag, name: str) -> str | None:
     """Return a single string-valued attribute, or None (bs4 attrs are str | list[str])."""
@@ -48,8 +61,8 @@ def year_from_aktenzeichen(aktenzeichen: str) -> int:
     return 2000 + two_digit if two_digit < 50 else 1900 + two_digit
 
 
-def filename_from_pdf_url(url: str) -> str:
-    """Return the bare filename of a PDF URL."""
+def filename_from_url(url: str) -> str:
+    """Return the bare filename of a document URL (extension-agnostic)."""
     return urlsplit(url).path.rsplit("/", 1)[-1]
 
 
@@ -84,14 +97,14 @@ def phase_from_url(page_url: str) -> str:
 
 
 def _parse_documents(content: Tag, base: str, aktenzeichen: str) -> list[Document]:
-    """Build the list of PDF Documents linked from a proceeding page's content."""
+    """Build the list of downloadable Documents (PDF, Excel, …) linked from a page's content."""
     documents: list[Document] = []
-    for anchor in content.select('a[href*=".pdf"]'):
+    for anchor in content.select("a[href]"):
         href_attr = _attr_str(anchor, "href")
-        if href_attr is None:
+        if href_attr is None or not _is_document_href(href_attr):
             continue
         href = urljoin(base, href_attr)
-        filename = filename_from_pdf_url(href)
+        filename = filename_from_url(href)
         documents.append(
             Document(
                 title=anchor.get_text(strip=True) or filename,
@@ -104,7 +117,7 @@ def _parse_documents(content: Tag, base: str, aktenzeichen: str) -> list[Documen
 
 
 def parse_candidate_documents(html: str, page_url: str) -> list[CandidateDocument]:
-    """Extract every PDF link on a page as a CandidateDocument, with source context.
+    """Extract every document link (PDF, Excel, …) on a page as a CandidateDocument, with context.
 
     Unlike :func:`_parse_documents`, this works on any page (topic pages, notice pages),
     so the Aktenzeichen may be absent — in which case ``aktenzeichen``/``doc_type`` are None.
@@ -113,15 +126,15 @@ def parse_candidate_documents(html: str, page_url: str) -> list[CandidateDocumen
     base = _effective_base(soup, page_url)
     candidates: list[CandidateDocument] = []
     seen: set[str] = set()
-    for anchor in soup.select('a[href*=".pdf"]'):
+    for anchor in soup.select("a[href]"):
         href_attr = _attr_str(anchor, "href")
-        if href_attr is None:
+        if href_attr is None or not _is_document_href(href_attr):
             continue
         href = urljoin(base, href_attr)
         if href in seen:
             continue
         seen.add(href)
-        filename = filename_from_pdf_url(href)
+        filename = filename_from_url(href)
         try:
             aktenzeichen: str | None = aktenzeichen_from_url(href)
         except ValueError:
@@ -141,16 +154,17 @@ def parse_candidate_documents(html: str, page_url: str) -> list[CandidateDocumen
 
 
 def parse_followable_links(html: str, page_url: str) -> list[str]:
-    """Return de-duplicated absolute URLs of non-PDF HTML anchors on the page.
+    """Return de-duplicated absolute URLs of HTML sub-page anchors on the page.
 
-    Used by the bounded crawler to enqueue sub-pages. PDF links are excluded (they are
-    handled by :func:`parse_candidate_documents`)."""
+    Used by the bounded crawler to enqueue sub-pages. Document links (PDF, Excel, …) are
+    excluded — they are handled by :func:`parse_candidate_documents` and must not be fetched
+    as HTML."""
     soup = BeautifulSoup(html, "lxml")
     base = _effective_base(soup, page_url)
     links: list[str] = []
     for anchor in soup.select("a[href]"):
         href = _attr_str(anchor, "href")
-        if not href or ".pdf" in href.lower():
+        if not href or _is_document_href(href):
             continue
         links.append(urljoin(base, href))
     return list(dict.fromkeys(links))
