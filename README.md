@@ -77,6 +77,11 @@ Documents that carry an Aktenzeichen are written under `<year>/<aktenzeichen>/`;
 without one (e.g. the PID-Liste in the Datenformate tree) go under `_other/…`. A root
 `manifest.json` lists the kept documents.
 
+Link detection is not limited to PDFs: `.pdf`, `.xlsx` and `.xls` are all mirrored. BNetzA
+publishes the **Liste der Prüfidentifikatoren (PID)** as both a PDF and a machine-friendly
+Excel file — the Excel is captured too, so a predicate like the one above picks up
+`PID_..._info_....xlsx` right next to its PDF.
+
 ## Output layout
 
 Proceedings are written under `/{year}/{aktenzeichen}/`, with a top-level

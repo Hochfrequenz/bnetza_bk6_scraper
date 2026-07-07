@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 
 class Document(BaseModel):
-    """A single downloadable document (PDF) belonging to a proceeding."""
+    """A single downloadable document (PDF, Excel, …) belonging to a proceeding."""
 
     title: str
     """Human-readable link text, e.g. ``"Konsultationsdokument"``."""
@@ -92,4 +92,4 @@ class Proceeding(BaseModel):
     """All phase pages discovered for this Aktenzeichen."""
 
     documents: list[Document] = []
-    """All PDFs linked from the proceeding's pages."""
+    """All documents (PDF, Excel, …) linked from the proceeding's pages."""

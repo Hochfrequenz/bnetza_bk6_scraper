@@ -1,6 +1,6 @@
 import pytest
 
-from bnetza_bk6_scraper.parse import aktenzeichen_from_url, filename_from_pdf_url, year_from_aktenzeichen
+from bnetza_bk6_scraper.parse import aktenzeichen_from_url, filename_from_url, year_from_aktenzeichen
 
 
 @pytest.mark.parametrize(
@@ -23,9 +23,19 @@ def test_year_from_aktenzeichen(az: str, expected: int) -> None:
     assert year_from_aktenzeichen(az) == expected
 
 
-def test_filename_from_pdf_url() -> None:
-    url = "/DE/.../BK6-23-241/BK6-23-241_konsultationsdokument.pdf"
-    assert filename_from_pdf_url(url) == "BK6-23-241_konsultationsdokument.pdf"
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("/DE/.../BK6-23-241/BK6-23-241_konsultationsdokument.pdf", "BK6-23-241_konsultationsdokument.pdf"),
+        # Excel PID list, with the ?__blob download query BNetzA appends
+        (
+            "/DE/.../Mitteilung_55/Anlagen/PID_4_0_info_Konsultationsfassung.xlsx?__blob=publicationFile&v=1",
+            "PID_4_0_info_Konsultationsfassung.xlsx",
+        ),
+    ],
+)
+def test_filename_from_url(url: str, expected: str) -> None:
+    assert filename_from_url(url) == expected
 
 
 def test_aktenzeichen_from_url_raises_when_absent() -> None:
