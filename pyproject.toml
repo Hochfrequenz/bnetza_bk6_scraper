@@ -47,11 +47,11 @@ linting = [
     { include-group = "tests" },
 ]
 type_check = [
-    "mypy==2.1.0",
+    "mypy==2.3.0",
     { include-group = "tests" },
 ]
 spell_check = [
-    "codespell==2.4.2",
+    "codespell==2.4.3",
 ]
 coverage = [
     "coverage==7.15.0",
