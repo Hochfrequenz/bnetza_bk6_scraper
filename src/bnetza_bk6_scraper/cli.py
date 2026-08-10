@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -23,10 +22,8 @@ def main() -> None:
 def mirror(
     target: Path = typer.Option(..., "--target", help="Output directory (mirror repo root)."),
     concurrency: int = typer.Option(4, "--concurrency", help="Parallel fetches."),
-    year: Optional[int] = typer.Option(None, "--year", help="Restrict to a single year."),
-    min_year: Optional[int] = typer.Option(
-        None, "--min-year", help="Skip proceedings older than this year (e.g. 2015)."
-    ),
+    year: int | None = typer.Option(None, "--year", help="Restrict to a single year."),
+    min_year: int | None = typer.Option(None, "--min-year", help="Skip proceedings older than this year (e.g. 2015)."),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Debug logging."),
 ) -> None:
     """Download BK6 proceedings into TARGET as a structured, diffable tree."""

@@ -6,10 +6,20 @@ on:
   pull_request: {}
 jobs:
   format:
+    # The check names below (`format (black)`, `format (isort)`) are pinned as required
+    # status checks in the branch ruleset. Both tools were replaced by ruff, but the
+    # matrix values and this explicit job name are kept as-is so the check names don't
+    # change - renaming them requires updating the ruleset in the same change, which we
+    # deliberately didn't do here.
+    name: "format (${{ matrix.tool }})"
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tool: ["black", "isort"]
+        include:
+          - tool: black
+            command: ruff format --check .
+          - tool: isort
+            command: ruff check --select I .
     steps:
       - uses: actions/checkout@v7
       - name: Install uv
@@ -18,4 +28,4 @@ jobs:
           python-version: "3.14"
       - name: ${{ matrix.tool }} Code Formatter
         run: |
-          uv run --group formatting ${{ matrix.tool }} . --check
+          uv run --group linting ${{ matrix.command }}
