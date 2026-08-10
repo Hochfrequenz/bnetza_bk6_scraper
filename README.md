@@ -134,12 +134,13 @@ error. No credentials or API keys are required.
 
 ## Contribute
 
-This project uses [tox](https://tox.wiki) for all quality gates. Create a
+This project uses [uv](https://docs.astral.sh/uv/) for all quality gates. Create a
 one-shot development environment with everything installed:
 
 ```bash
-tox -e dev
+uv sync --group dev
 ```
 
-Individual gates: `tox -e tests`, `tox -e linting`, `tox -e type_check`,
-`tox -e coverage`, and `tox -e spell_check`. Run the full suite with `tox`.
+Individual gates: `uv run --group tests pytest`, `uv run --group linting pylint bnetza_bk6_scraper`,
+`uv run --group type_check mypy --strict src/bnetza_bk6_scraper`, `uv run --group coverage coverage run -m pytest`,
+and `uv run --group spell_check codespell src`.

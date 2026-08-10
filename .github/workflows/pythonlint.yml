@@ -13,14 +13,27 @@ jobs:
         linter-env: ["linting", "type_check", "spell_check"]
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
         with:
-          python-version: 3.14
-      - name: Install Dependencies
+          python-version: "3.14"
+      - name: Run ${{ matrix.linter-env }}
         run: |
-          python -m pip install --upgrade pip
-          pip install tox
-      - name: Run ${{ matrix.linter-env }} via Tox
-        run: |
-          tox -e ${{ matrix.linter-env }}
+          case "${{ matrix.linter-env }}" in
+            linting)
+              uv run --group linting pylint bnetza_bk6_scraper
+              uv run --group linting pylint unittests --rcfile=unittests/.pylintrc
+              ;;
+            type_check)
+              uv run --group type_check mypy --show-error-codes src/bnetza_bk6_scraper --strict
+              uv run --group type_check mypy --show-error-codes unittests --strict
+              ;;
+            spell_check)
+              uv run --group spell_check codespell --ignore-words=domain-specific-terms.txt src
+              uv run --group spell_check codespell --ignore-words=domain-specific-terms.txt README.md
+              ;;
+            *)
+              echo "::error::Unknown matrix.linter-env value: '${{ matrix.linter-env }}'" >&2
+              exit 1
+              ;;
+          esac
