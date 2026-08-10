@@ -32,4 +32,8 @@ jobs:
               uv run --group spell_check codespell --ignore-words=domain-specific-terms.txt src
               uv run --group spell_check codespell --ignore-words=domain-specific-terms.txt README.md
               ;;
+            *)
+              echo "::error::Unknown matrix.linter-env value: '${{ matrix.linter-env }}'" >&2
+              exit 1
+              ;;
           esac
