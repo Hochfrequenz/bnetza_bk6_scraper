@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 from aioresponses import aioresponses
 
@@ -63,7 +61,7 @@ async def test_get_bytes_retries_on_waf_block_page() -> None:
 async def test_fetch_retries_on_timeout() -> None:
     url = "https://www.bundesnetzagentur.de/slow.html"
     with aioresponses() as mocked:
-        mocked.get(url, exception=asyncio.TimeoutError())
+        mocked.get(url, exception=TimeoutError())
         mocked.get(url, status=200, body="ok")
         async with Fetcher(max_retries=2, backoff_seconds=0) as fetcher:
             body = await fetcher.get_text(url)

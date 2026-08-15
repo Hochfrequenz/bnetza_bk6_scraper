@@ -35,7 +35,7 @@ class Fetcher:
         self._backoff = backoff_seconds
         self._session: aiohttp.ClientSession | None = None
 
-    async def __aenter__(self) -> "Fetcher":
+    async def __aenter__(self) -> Fetcher:
         self._session = aiohttp.ClientSession(headers=_HEADERS, timeout=_TIMEOUT)
         return self
 
@@ -71,7 +71,7 @@ class Fetcher:
                         if _WAF_BLOCK_MARKER.encode() in data:
                             raise WafBlockedError(url)
                         return data
-                except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                except (TimeoutError, aiohttp.ClientError) as exc:
                     last_exc = exc
             if attempt < self._max_retries:
                 await asyncio.sleep(self._backoff * (attempt + 1))

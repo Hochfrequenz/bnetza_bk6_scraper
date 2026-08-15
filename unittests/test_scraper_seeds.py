@@ -9,13 +9,10 @@ from bnetza_bk6_scraper.scraper import BnetzaBk6Scraper
 
 BASE = "https://www.bundesnetzagentur.de"
 SEED = f"{BASE}/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/831_gpke/gpke_node.html"
-GPKE_PDF = f"{BASE}/DE/Beschlusskammern/1_GZ/BK6-GZ/2024/BK6-24-174/Beschluss/" "BK6-24-174_GPKE_Teil1_Lesefassung.pdf"
-GPKE_AENDERUNG = (
-    f"{BASE}/DE/Beschlusskammern/1_GZ/BK6-GZ/2024/BK6-24-174/Beschluss/" "BK6-24-174_GPKE_Teil1_Aenderung.pdf"
-)
+GPKE_PDF = f"{BASE}/DE/Beschlusskammern/1_GZ/BK6-GZ/2024/BK6-24-174/Beschluss/BK6-24-174_GPKE_Teil1_Lesefassung.pdf"
+GPKE_AENDERUNG = f"{BASE}/DE/Beschlusskammern/1_GZ/BK6-GZ/2024/BK6-24-174/Beschluss/BK6-24-174_GPKE_Teil1_Aenderung.pdf"
 PID_PDF = (
-    f"{BASE}/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/835_mitteilungen_datenformate/"
-    "Mitteilung_48/Anlagen/PID_3_2.pdf"
+    f"{BASE}/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/835_mitteilungen_datenformate/Mitteilung_48/Anlagen/PID_3_2.pdf"
 )
 SEED_HTML = (
     "<html><head><base href='/'/></head><body>"

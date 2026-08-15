@@ -141,6 +141,6 @@ one-shot development environment with everything installed:
 uv sync --group dev
 ```
 
-Individual gates: `uv run --group tests pytest`, `uv run --group linting pylint bnetza_bk6_scraper`,
-`uv run --group type_check mypy --strict src/bnetza_bk6_scraper`, `uv run --group coverage coverage run -m pytest`,
-and `uv run --group spell_check codespell src`.
+Individual gates: `uv run --group tests pytest`, `uv run --group linting ruff check .`,
+`uv run --group linting ruff format --check .`, `uv run --group type_check mypy --strict src/bnetza_bk6_scraper`,
+`uv run --group coverage coverage run -m pytest`, and `uv run --group spell_check codespell src`.
