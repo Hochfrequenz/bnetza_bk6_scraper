@@ -43,7 +43,7 @@ tests = [
     "aioresponses==0.7.9",
 ]
 linting = [
-    "ruff==0.16.4",
+    "ruff==0.16.5",
     { include-group = "tests" },
 ]
 type_check = [
