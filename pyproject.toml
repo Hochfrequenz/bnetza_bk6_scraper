@@ -40,7 +40,7 @@ Homepage = "https://github.com/Hochfrequenz/bnetza_bk6_scraper"
 [dependency-groups]
 tests = [
     "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "pytest-asyncio==1.4.1",
     "aioresponses==0.7.9",
 ]
 linting = [
